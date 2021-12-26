@@ -1,3 +1,11 @@
+/* box.hpp
+
+ * Copyright (C) 2021 SS47816
+ 
+ * Implementation of the Box and BoxQ class
+
+**/
+
 #pragma once
 
 #include <Eigen/Geometry> 
