@@ -37,43 +37,47 @@ class ObstacleDetectorNode
   tf2_ros::Buffer tf2_buffer;
   tf2_ros::TransformListener tf2_listener;
 
-  ros::Subscriber sub_pointcloud;
-  ros::Publisher jsk_bboxes_pub;
-  ros::Publisher autoware_objects_pub;
+  ros::Subscriber sub_lidar_points;
+  ros::Publisher pub_cloud_ground;
+  ros::Publisher pub_cloud_clusters;
+  // ros::Publisher pub_jsk_bboxes;
+  // ros::Publisher pub_autoware_objects;
 
-  void pointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& pointcloud);
-  jsk_recognition_msgs::BoundingBox transformJskBbox(const lgsvl_msgs::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed);
-  autoware_msgs::DetectedObject transformAutowareObject(const lgsvl_msgs::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed);
+  void lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points);
+  // jsk_recognition_msgs::BoundingBox transformJskBbox(const lidar_obstacle_detector::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed);
+  // autoware_msgs::DetectedObject transformAutowareObject(const lidar_obstacle_detector::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed);
 };
 
 ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 {
   ros::NodeHandle private_nh("~");
   
-  std::string lgsvl_gt2d_topic;
-  std::string lgsvl_gt3d_topic;
-  std::string jsk_bboxes_topic;
-  std::string autoware_objects_topic;
+  std::string lidar_points_topic;
+  std::string cloud_ground_topic;
+  std::string cloud_clusters_topic;
+  // std::string jsk_bboxes_topic;
+  // std::string autoware_objects_topic;
   
-  ROS_ASSERT(private_nh.getParam("lgsvl_gt2d_topic", lgsvl_gt2d_topic));
-  ROS_ASSERT(private_nh.getParam("lgsvl_gt3d_topic", lgsvl_gt3d_topic));
-  ROS_ASSERT(private_nh.getParam("jsk_bboxes_topic", jsk_bboxes_topic));
-  ROS_ASSERT(private_nh.getParam("autoware_objects_topic", autoware_objects_topic));
-  ROS_ASSERT(private_nh.getParam("bbox_target_frame", bbox_target_frame_));
-  ROS_ASSERT(private_nh.getParam("bbox_filter_size", bbox_filter_size_));
+  ROS_ASSERT(private_nh.getParam("lidar_points_topic", lidar_points_topic));
+  ROS_ASSERT(private_nh.getParam("cloud_ground_topic", cloud_ground_topic));
+  ROS_ASSERT(private_nh.getParam("cloud_clusters_topic", cloud_clusters_topic));
+  // ROS_ASSERT(private_nh.getParam("jsk_bboxes_topic", jsk_bboxes_topic));
+  // ROS_ASSERT(private_nh.getParam("autoware_objects_topic", autoware_objects_topic));
 
-  lgsvl_gt2d_sub = nh.subscribe(lgsvl_gt2d_topic, 1, &ObstacleDetectorNode::detections2DCallback, this);
-  lgsvl_gt3d_sub = nh.subscribe(lgsvl_gt3d_topic, 1, &ObstacleDetectorNode::detections3DCallback, this);
-  jsk_bboxes_pub = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>(jsk_bboxes_topic, 1);
-  autoware_objects_pub = nh.advertise<autoware_msgs::DetectedObjectArray>(autoware_objects_topic, 1);
+  sub_lidar_points = nh.subscribe(lidar_points_topic, 1, &ObstacleDetectorNode::lidarPointsCallback, this);
+  // jsk_bboxes_pub = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>(jsk_bboxes_topic, 1);
+  // autoware_objects_pub = nh.advertise<autoware_msgs::DetectedObjectArray>(autoware_objects_topic, 1);
 }
 
-void ObstacleDetectorNode::detections2DCallback(const lgsvl_msgs::Detection2DArray::ConstPtr& lgsvl_detections2d)
+void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& pointcloud)
 {
-  lgsvl_detections2d->header;
+  
 }
 
-jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const lgsvl_msgs::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed)
+
+/**
+ 
+jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const lidar_obstacle_detector::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed)
 {
   jsk_recognition_msgs::BoundingBox jsk_bbox;
   jsk_bbox.header = lgsvl_detection3d->header;
@@ -98,7 +102,7 @@ jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const l
   return std::move(jsk_bbox);
 }
 
-autoware_msgs::DetectedObject ObstacleDetectorNode::transformAutowareObject(const lgsvl_msgs::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed)
+autoware_msgs::DetectedObject ObstacleDetectorNode::transformAutowareObject(const lidar_obstacle_detector::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed)
 {
   autoware_msgs::DetectedObject autoware_object;
   autoware_object.header = lgsvl_detection3d->header;
@@ -137,48 +141,14 @@ autoware_msgs::DetectedObject ObstacleDetectorNode::transformAutowareObject(cons
   return std::move(autoware_object);
 }
 
-void ObstacleDetectorNode::detections3DCallback(const lgsvl_msgs::Detection3DArray::ConstPtr& lgsvl_detections3d)
-{
-  geometry_msgs::TransformStamped transform_stamped;
-  try
-  {
-    transform_stamped = tf2_buffer.lookupTransform(bbox_target_frame_, lgsvl_detections3d->header.frame_id, ros::Time(0));
-  }
-  catch (tf2::TransformException& ex)
-  {
-    ROS_WARN("%s", ex.what());
-    return;
-  }
+**/
 
-  jsk_recognition_msgs::BoundingBoxArray jsk_bboxes;
-  jsk_bboxes.header = lgsvl_detections3d->header;
-  jsk_bboxes.header.frame_id = bbox_target_frame_;
-  autoware_msgs::DetectedObjectArray autoware_objects;
-  autoware_objects.header = lgsvl_detections3d->header;
-  autoware_objects.header.frame_id = bbox_target_frame_;
-  
-  for (const auto& lgsvl_detection3d : lgsvl_detections3d->detections)
-  {
-    // Filter out false objects from lgsvl
-    if (lgsvl_detection3d.bbox.size.z < bbox_filter_size_)
-    {
-      geometry_msgs::Pose pose_transformed;
-      tf2::doTransform(lgsvl_detection3d.bbox.position, pose_transformed, transform_stamped);
-      auto lgsvl_detection3d_ptr = boost::make_shared<lgsvl_msgs::Detection3D>(lgsvl_detection3d);
-      jsk_bboxes.boxes.emplace_back(transformJskBbox(lgsvl_detection3d_ptr, pose_transformed));
-      autoware_objects.objects.emplace_back(transformAutowareObject(lgsvl_detection3d_ptr, pose_transformed));
-    }
-  }
-  jsk_bboxes_pub.publish(std::move(jsk_bboxes));
-  autoware_objects_pub.publish(std::move(autoware_objects));
-}
-
-} // namespace lgsvl_utils
+} // namespace lidar_obstacle_detector
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "gt_viewer_node");
-  lgsvl_utils::ObstacleDetectorNode gt_viewer_node;
-  ros::spin();  // spin the ros node.
+  ros::init(argc, argv, "obstacle_detector_node");
+  lidar_obstacle_detector::ObstacleDetectorNode obstacle_detector_node;
+  ros::spin();
   return 0;
 }
