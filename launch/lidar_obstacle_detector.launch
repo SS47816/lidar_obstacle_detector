@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node name="obstacle_detector_node" pkg="lidar_obstacle_detector" type="obstacle_detector_node" output="screen">
+    <!-- Input Topic Names -->
+    <param name="lidar_points_topic"                 value="/simulator/ground_truth/points_center_raw"/>
+    <!-- Output Topic Names -->
+    <param name="cloud_ground_topic"                 value="/detection/lidar_detector/cloud_ground"/>
+    <param name="cloud_clusters_topic"               value="/detection/lidar_detector/cloud_clusters"/>
+  </node>
+
+</launch>
