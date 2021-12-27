@@ -96,7 +96,6 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points)
 {
   ROS_INFO("lidar points recieved");
-  // auto raw_cloud = rosPointCloud2toPCL(lidar_points);
   pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*lidar_points, *raw_cloud);
 
@@ -108,7 +107,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
 
   // Cluster objects
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->Clustering(segmentCloud.first, 1.0, 3, 30);
-  int clusterId = 0;
+  
   // std::vector<Color> colors = {Color(1, 0, 1), Color(1, 1, 0), Color(0, 0, 1)};
 
   // Construct Bounding Boxes from the clusters
@@ -130,22 +129,33 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   // autoware_objects.header = lidar_points->header;
   // autoware_objects.header.frame_id = bbox_target_frame_;
 
+  int clusterId = 0;
+  std::vector<Box> curBoxes;
   for (auto cluster : cloudClusters)
   {
-    // Render Bounding Boxes
-    // Box box = obstacle_detector->BoundingBox(cluster);
-    // renderBox(viewer, box, clusterId);
-    BoxQ box = obstacle_detector->MinimumBoundingBox(cluster);
-    // renderBox(viewer, box, clusterId);
-
+    // Create Bounding Boxes
+    auto box = obstacle_detector->BoundingBox(cluster, clusterId, clusterId%colors.size());
     geometry_msgs::Pose pose;
-    pose.position.x = box.bboxTransform(0);
-    pose.position.y = box.bboxTransform(1);
-    pose.position.z = box.bboxTransform(2);
-    pose.orientation.x = box.bboxQuaternion.x();
-    pose.orientation.y = box.bboxQuaternion.y();
-    pose.orientation.z = box.bboxQuaternion.z();
-    pose.orientation.w = box.bboxQuaternion.w();
+    pose.position.x = box.x_max;
+    // pose.position.y = box.bboxTransform(1);
+    // pose.position.z = box.bboxTransform(2);
+    // pose.orientation.x = box.bboxQuaternion.x();
+    // pose.orientation.y = box.bboxQuaternion.y();
+    // pose.orientation.z = box.bboxQuaternion.z();
+    // pose.orientation.w = box.bboxQuaternion.w();
+
+    curBoxes.emplace_back();
+
+    // BoxQ box = obstacle_detector->MinimumBoundingBox(cluster);
+
+    // geometry_msgs::Pose pose;
+    // pose.position.x = box.bboxTransform(0);
+    // pose.position.y = box.bboxTransform(1);
+    // pose.position.z = box.bboxTransform(2);
+    // pose.orientation.x = box.bboxQuaternion.x();
+    // pose.orientation.y = box.bboxQuaternion.y();
+    // pose.orientation.z = box.bboxQuaternion.z();
+    // pose.orientation.w = box.bboxQuaternion.w();
 
     geometry_msgs::Pose pose_transformed;
     tf2::doTransform(pose, pose_transformed, transform_stamped);
