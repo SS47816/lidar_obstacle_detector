@@ -25,8 +25,6 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/transforms.h>
 
-#include <jsk_recognition_msgs/BoundingBox.h>
-
 #include "box.hpp"
 
 namespace lidar_obstacle_detector
@@ -41,45 +39,40 @@ class ObstacleDetector
 
   // ****************** Tracking ***********************
 
-  typename pcl::PointCloud<PointT>::Ptr FilterCloud(typename pcl::PointCloud<PointT>::Ptr cloud, float filterRes, Eigen::Vector4f minPoint, Eigen::Vector4f maxPoint);
+  typename pcl::PointCloud<PointT>::Ptr FilterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filterRes, const Eigen::Vector4f& minPoint, const Eigen::Vector4f& maxPoint);
   
-  std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SegmentPlane(typename pcl::PointCloud<PointT>::Ptr cloud, int maxIterations, float distanceThreshold);
+  std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SegmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int maxIterations, const float distanceThreshold);
 
-  std::vector<typename pcl::PointCloud<PointT>::Ptr> Clustering(typename pcl::PointCloud<PointT>::Ptr cloud, float clusterTolerance, int minSize, int maxSize);
+  std::vector<typename pcl::PointCloud<PointT>::Ptr> Clustering(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float clusterTolerance, const int minSize, const int maxSize);
 
-  Box BoundingBox(typename pcl::PointCloud<PointT>::Ptr cluster, int id, int colorId);
+  Box BoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id);
 
-  BoxQ MinimumBoundingBox(typename pcl::PointCloud<PointT>::Ptr cluster);
-
-  void numPoints(typename pcl::PointCloud<PointT>::Ptr cloud);
+  Box MinimumBoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id);
 
   // ****************** Tracking ***********************
 
  private:
   
-  std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SeparateClouds(pcl::PointIndices::Ptr inliers, typename pcl::PointCloud<PointT>::Ptr cloud);
+  std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SeparateClouds(const pcl::PointIndices::ConstPtr& inliers, const typename pcl::PointCloud<PointT>::ConstPtr& cloud);
 
   // ****************** Tracking ***********************
-  std::vector<float> getCentroid(const Box &a);
 
-  std::vector<float> getDimension(const Box &a);
-
-  bool compareBoxes(const Box &a, const Box &b, float displacementTol, float dimensionTol);
+  bool compareBoxes(const Box& a, const Box& b, const float displacementTol, const float dimensionTol);
 
   // Link nearby bounding boxes between the previous and previous frame
-  std::vector<std::vector<int>> associateBoxes(const std::vector<Box> &preBoxes, const std::vector<Box> &curBoxes, float displacementTol, float dimensionTol);
+  std::vector<std::vector<int>> associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curBoxes, const float displacementTol, const float dimensionTol);
 
-  // connectionMatrix
-  std::vector<std::vector<int>> connectionMatrix(const std::vector<std::vector<int>> &connectionPairs, std::vector<int> &left, std::vector<int> &right);
+  // Connection Matrix
+  std::vector<std::vector<int>> connectionMatrix(const std::vector<std::vector<int>>& connectionPairs, std::vector<int>& left, std::vector<int>& right);
 
   // Helper function for Hungarian Algorithm
-  bool hungarianFind(const int i, const std::vector<std::vector<int>> &connectionMatrix, std::vector<bool> &right_connected, std::vector<int> &right_pair);
+  bool hungarianFind(const int i, const std::vector<std::vector<int>>& connectionMatrix, std::vector<bool>& right_connected, std::vector<int>& right_pair);
 
   // Customized Hungarian Algorithm
-  std::vector<int> hungarian(const std::vector<std::vector<int>> &connectionMatrix);
+  std::vector<int> hungarian(const std::vector<std::vector<int>>& connectionMatrix);
 
   // Helper function for searching the box index in boxes given an id
-  int searchBoxIndex(const std::vector<Box> &Boxes, int id);
+  int searchBoxIndex(const std::vector<Box>& Boxes, const int id);
 };
 
 // constructor:
@@ -91,13 +84,7 @@ template <typename PointT>
 ObstacleDetector<PointT>::~ObstacleDetector() {}
 
 template <typename PointT>
-void ObstacleDetector<PointT>::numPoints(typename pcl::PointCloud<PointT>::Ptr cloud)
-{
-  std::cout << cloud->points.size() << std::endl;
-}
-
-template <typename PointT>
-typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::FilterCloud(typename pcl::PointCloud<PointT>::Ptr cloud, float filterRes, Eigen::Vector4f minPoint, Eigen::Vector4f maxPoint)
+typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::FilterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filterRes, const Eigen::Vector4f& minPoint, const Eigen::Vector4f& maxPoint)
 {
 
   // Time segmentation process
@@ -146,7 +133,7 @@ typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::FilterCloud(type
 }
 
 template <typename PointT>
-std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::SeparateClouds(pcl::PointIndices::Ptr inliers, typename pcl::PointCloud<PointT>::Ptr cloud)
+std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::SeparateClouds(const pcl::PointIndices::ConstPtr& inliers, const typename pcl::PointCloud<PointT>::ConstPtr& cloud)
 {
   // TODO: Create two new point clouds, one cloud with obstacles and other with segmented plane
   typename pcl::PointCloud<PointT>::Ptr obstCloud(new pcl::PointCloud<PointT>());
@@ -170,7 +157,7 @@ std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT
 }
 
 template <typename PointT>
-std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::SegmentPlane(typename pcl::PointCloud<PointT>::Ptr cloud, int maxIterations, float distanceThreshold)
+std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::SegmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int maxIterations, const float distanceThreshold)
 {
   // Time segmentation process
   auto startTime = std::chrono::steady_clock::now();
@@ -203,7 +190,7 @@ std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT
 }
 
 template <typename PointT>
-std::vector<typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::Clustering(typename pcl::PointCloud<PointT>::Ptr cloud, float clusterTolerance, int minSize, int maxSize)
+std::vector<typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::Clustering(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float clusterTolerance, const int minSize, const int maxSize)
 {
 
   // Time clustering process
@@ -238,36 +225,28 @@ std::vector<typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::Clu
     clusters.push_back(cloudCluster);
   }
 
-  auto endTime = std::chrono::steady_clock::now();
-  auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+  const auto endTime = std::chrono::steady_clock::now();
+  const auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
   std::cout << "clustering took " << elapsedTime.count() << " milliseconds and found " << clusters.size() << " clusters" << std::endl;
 
   return clusters;
 }
 
 template <typename PointT>
-Box ObstacleDetector<PointT>::BoundingBox(typename pcl::PointCloud<PointT>::Ptr cluster, int id, int colorId)
+Box ObstacleDetector<PointT>::BoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id)
 {
-
   // Find bounding box for one of the clusters
   PointT minPoint, maxPoint;
   pcl::getMinMax3D(*cluster, minPoint, maxPoint);
+  
+  const Eigen::Vector3f position((maxPoint.x + minPoint.x)/2, (maxPoint.y + minPoint.y)/2, (maxPoint.z + minPoint.z)/2);
+  const Eigen::Vector3f dimension((maxPoint.x - minPoint.x), (maxPoint.y - minPoint.y), (maxPoint.z - minPoint.z));
 
-  Box box;
-  box.id = id;
-  box.color = colorId;
-  box.x_min = minPoint.x;
-  box.y_min = minPoint.y;
-  box.z_min = minPoint.z;
-  box.x_max = maxPoint.x;
-  box.y_max = maxPoint.y;
-  box.z_max = maxPoint.z;
-
-  return box;
+  return Box(id, position, dimension);
 }
 
 template <typename PointT>
-BoxQ ObstacleDetector<PointT>::MinimumBoundingBox(typename pcl::PointCloud<PointT>::Ptr cluster)
+Box ObstacleDetector<PointT>::MinimumBoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id)
 {
   // Find bounding box for one of the clusters
 
@@ -321,52 +300,29 @@ BoxQ ObstacleDetector<PointT>::MinimumBoundingBox(typename pcl::PointCloud<Point
   const Eigen::Vector3f meanDiagonal = 0.5f * (maxPoint.getVector3fMap() + minPoint.getVector3fMap());
 
   // Final transform
-  const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA); // Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
-  const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
+  const Eigen::Quaternionf quaternion(eigenVectorsPCA); // Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
+  const Eigen::Vector3f position = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
+  const Eigen::Vector3f dimension((maxPoint.x - minPoint.x), (maxPoint.y - minPoint.y), (maxPoint.z - minPoint.z));
 
-  // Form the box
-  BoxQ box;
-  box.cube_length = maxPoint.x - minPoint.x;
-  box.cube_width = maxPoint.y - minPoint.y;
-  box.cube_height = maxPoint.z - minPoint.z;
-  box.bboxQuaternion = bboxQuaternion;
-  box.bboxTransform = bboxTransform;
-
-  return box;
+  return Box(id, position, dimension, quaternion);
 }
 
 // ************************* Tracking ***************************
-template <typename PointT>
-std::vector<float> ObstacleDetector<PointT>::getCentroid(const Box &a)
-{
-  return {(a.x_max + a.x_min) / 2, (a.y_max + a.y_min) / 2, (a.z_max + a.z_min) / 2};
-}
 
 template <typename PointT>
-std::vector<float> ObstacleDetector<PointT>::getDimension(const Box &a)
+bool ObstacleDetector<PointT>::compareBoxes(const Box& a, const Box& b, const float displacementTol, const float dimensionTol)
 {
-  return {a.x_max - a.x_min, a.y_max - a.y_min, a.z_max - a.z_min};
-}
-
-template <typename PointT>
-bool ObstacleDetector<PointT>::compareBoxes(const Box &a, const Box &b, float displacementTol, float dimensionTol)
-{
-  const std::vector<float> a_ctr = this->getCentroid(a);
-  const std::vector<float> b_ctr = this->getCentroid(b);
-  const std::vector<float> a_dim = this->getDimension(a);
-  const std::vector<float> b_dim = this->getDimension(b);
-
   // Percetage Displacements ranging between [0.0, +oo]
-  const float dis = sqrt((a_ctr[0] - b_ctr[0]) * (a_ctr[0] - b_ctr[0]) + (a_ctr[1] - b_ctr[1]) * (a_ctr[1] - b_ctr[1]) + (a_ctr[2] - b_ctr[2]) * (a_ctr[2] - b_ctr[2]));
+  const float dis = sqrt((a.position[0] - b.position[0]) * (a.position[0] - b.position[0]) + (a.position[1] - b.position[1]) * (a.position[1] - b.position[1]) + (a.position[2] - b.position[2]) * (a.position[2] - b.position[2]));
 
-  const float a_max_dim = std::max(a_dim[0], std::max(a_dim[1], a_dim[2]));
-  const float b_max_dim = std::max(b_dim[0], std::max(b_dim[1], b_dim[2]));
+  const float a_max_dim = std::max(a.dimension[0], std::max(a.dimension[1], a.dimension[2]));
+  const float b_max_dim = std::max(b.dimension[0], std::max(b.dimension[1], b.dimension[2]));
   const float ctr_dis = dis / std::min(a_max_dim, b_max_dim);
 
   // Dimension similiarity values between [0.0, 1.0]
-  const float x_dim = 2 * (a_dim[0] - b_dim[0]) / (a_dim[0] + b_dim[0]);
-  const float y_dim = 2 * (a_dim[1] - b_dim[1]) / (a_dim[1] + b_dim[1]);
-  const float z_dim = 2 * (a_dim[2] - b_dim[2]) / (a_dim[2] + b_dim[2]);
+  const float x_dim = 2 * (a.dimension[0] - b.dimension[0]) / (a.dimension[0] + b.dimension[0]);
+  const float y_dim = 2 * (a.dimension[1] - b.dimension[1]) / (a.dimension[1] + b.dimension[1]);
+  const float z_dim = 2 * (a.dimension[2] - b.dimension[2]) / (a.dimension[2] + b.dimension[2]);
 
   if (ctr_dis <= displacementTol && x_dim <= dimensionTol && y_dim <= dimensionTol && z_dim <= dimensionTol)
   {
@@ -379,18 +335,18 @@ bool ObstacleDetector<PointT>::compareBoxes(const Box &a, const Box &b, float di
 }
 
 template <typename PointT>
-std::vector<std::vector<int>> ObstacleDetector<PointT>::associateBoxes(const std::vector<Box> &preBoxes, const std::vector<Box> &curBoxes, float displacementTol, float dimensionTol)
+std::vector<std::vector<int>> ObstacleDetector<PointT>::associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curBoxes, const float displacementTol, const float dimensionTol)
 {
   std::vector<std::vector<int>> connectionPairs;
 
-  for (auto &preBox : preBoxes)
+  for (auto &prev_box : prev_boxes)
   {
     for (auto &curBox : curBoxes)
     {
       // Add the indecies of a pair of similiar boxes to the matrix
-      if (this->compareBoxes(curBox, preBox, displacementTol, dimensionTol))
+      if (this->compareBoxes(curBox, prev_box, displacementTol, dimensionTol))
       {
-        connectionPairs.push_back({preBox.id, curBox.id});
+        connectionPairs.push_back({prev_box.id, curBox.id});
       }
     }
   }
@@ -399,7 +355,7 @@ std::vector<std::vector<int>> ObstacleDetector<PointT>::associateBoxes(const std
 }
 
 template <typename PointT>
-std::vector<std::vector<int>> ObstacleDetector<PointT>::connectionMatrix(const std::vector<std::vector<int>> &connectionPairs, std::vector<int> &left, std::vector<int> &right)
+std::vector<std::vector<int>> ObstacleDetector<PointT>::connectionMatrix(const std::vector<std::vector<int>>& connectionPairs, std::vector<int>& left, std::vector<int>& right)
 {
   // Hash the box ids in the connectionPairs to two vectors(sets), left and right
   for (auto &pair : connectionPairs)
@@ -449,7 +405,7 @@ std::vector<std::vector<int>> ObstacleDetector<PointT>::connectionMatrix(const s
 }
 
 template <typename PointT>
-bool ObstacleDetector<PointT>::hungarianFind(const int i, const std::vector<std::vector<int>> &connectionMatrix, std::vector<bool> &right_connected, std::vector<int> &right_pair)
+bool ObstacleDetector<PointT>::hungarianFind(const int i, const std::vector<std::vector<int>>& connectionMatrix, std::vector<bool>& right_connected, std::vector<int>& right_pair)
 {
   for (int j = 0; j < connectionMatrix[0].size(); ++j)
   {
@@ -467,7 +423,7 @@ bool ObstacleDetector<PointT>::hungarianFind(const int i, const std::vector<std:
 }
 
 template <typename PointT>
-std::vector<int> ObstacleDetector<PointT>::hungarian(const std::vector<std::vector<int>> &connectionMatrix)
+std::vector<int> ObstacleDetector<PointT>::hungarian(const std::vector<std::vector<int>>& connectionMatrix)
 {
   std::vector<bool> right_connected(connectionMatrix[0].size(), false);
   std::vector<int> right_pair(connectionMatrix[0].size(), -1);
@@ -485,7 +441,7 @@ std::vector<int> ObstacleDetector<PointT>::hungarian(const std::vector<std::vect
 }
 
 template <typename PointT>
-int ObstacleDetector<PointT>::searchBoxIndex(const std::vector<Box> &boxes, int id)
+int ObstacleDetector<PointT>::searchBoxIndex(const std::vector<Box>& boxes, const int id)
 {
   for (int i = 0; i < boxes.size(); i++)
   {
