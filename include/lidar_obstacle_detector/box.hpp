@@ -14,22 +14,18 @@ struct Box
 {
  public:
 	int id;
-	int color;
-	float x_min;
-	float y_min;
-	float z_min;
-	float x_max;
-	float y_max;
-	float z_max;
-};
+	Eigen::Vector3f position;
+	Eigen::Vector3f dimension;
+	Eigen::Quaternionf quaternion;
 
-struct BoxQ
-{
- public:
-  int id;
-	Eigen::Vector3f bboxTransform;
-	Eigen::Quaternionf bboxQuaternion;
-	float cube_length;
-  float cube_width;
-  float cube_height;
+	Box(int id, Eigen::Vector3f position, Eigen::Vector3f dimension)
+		: id(id), position(position), dimension(dimension)
+	{
+		quaternion = Eigen::Quaternionf(1, 0, 0, 0);
+	}
+
+	Box(int id, Eigen::Vector3f position, Eigen::Vector3f dimension, Eigen::Quaternionf quaternion)
+		: id(id), position(position), dimension(dimension), quaternion(quaternion)
+	{}
+
 };
