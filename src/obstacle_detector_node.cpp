@@ -127,29 +127,15 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   }
 
   sensor_msgs::PointCloud2::Ptr ground_cloud(new sensor_msgs::PointCloud2);
-  pcl::toROSMsg(*(segmentCloud.first), *ground_cloud);
+  pcl::toROSMsg(*(segmentCloud.second), *ground_cloud);
   ground_cloud->header = lidar_points->header;
 
   sensor_msgs::PointCloud2::Ptr obstacle_cloud(new sensor_msgs::PointCloud2);
   pcl::toROSMsg(*(segmentCloud.first), *obstacle_cloud);
   obstacle_cloud->header = lidar_points->header;
 
-  pub_cloud_ground.publish(ground_cloud);
-  pub_cloud_clusters.publish(obstacle_cloud);
-}
-
-pcl::PointCloud<pcl::PointXYZ>::Ptr ObstacleDetectorNode::rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud2)
-{
-  // Covert to pcl point cloud
-  // pcl::PCLPointCloud2 pcl_pc2;
-  // pcl_conversions::toPCL(*pointcloud2, pcl_pc2);
-  // pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  // pcl::fromPCLPointCloud2(pcl_pc2, *raw_cloud);
-
-  pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*pointcloud2, *raw_cloud);
-
-  return raw_cloud;
+  pub_cloud_ground.publish(std::move(ground_cloud));
+  pub_cloud_clusters.publish(std::move(obstacle_cloud));
 }
 
 
