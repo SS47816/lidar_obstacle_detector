@@ -43,8 +43,10 @@ class ObstacleDetectorNode
   float max_width = 10.0;
   float pos_height = 1.0;
   float neg_height = 2.0;
-
+  
   std::string bbox_target_frame_;
+
+  std::vector<Box> prev_boxes_;
 
   std::shared_ptr<ObstacleDetector<pcl::PointXYZ>> obstacle_detector;
 
@@ -59,7 +61,7 @@ class ObstacleDetectorNode
   // ros::Publisher pub_autoware_objects;
 
   void lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points);
-  jsk_recognition_msgs::BoundingBox transformJskBbox(const BoxQ& box, const geometry_msgs::Pose& pose_transformed);
+  jsk_recognition_msgs::BoundingBox transformJskBbox(const Box& box, const geometry_msgs::Pose& pose_transformed);
   // autoware_msgs::DetectedObject transformAutowareObject(const lidar_obstacle_detector::Detection3D::ConstPtr& box, const geometry_msgs::Pose& pose_transformed);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud2);
@@ -91,6 +93,7 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 
   // Create point processor
   obstacle_detector = std::make_shared<ObstacleDetector<pcl::PointXYZ>>();
+
 }
 
 void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points)
@@ -108,8 +111,6 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   // Cluster objects
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->Clustering(segmentCloud.first, 1.0, 3, 30);
   
-  // std::vector<Color> colors = {Color(1, 0, 1), Color(1, 1, 0), Color(0, 0, 1)};
-
   // Construct Bounding Boxes from the clusters
   geometry_msgs::TransformStamped transform_stamped;
   try
@@ -129,41 +130,29 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   // autoware_objects.header = lidar_points->header;
   // autoware_objects.header.frame_id = bbox_target_frame_;
 
-  int clusterId = 0;
-  std::vector<Box> curBoxes;
-  for (auto cluster : cloudClusters)
+  int cluster_id = 0;
+  std::vector<Box> curr_boxes;
+  for (auto& cluster : cloudClusters)
   {
     // Create Bounding Boxes
-    auto box = obstacle_detector->BoundingBox(cluster, clusterId, clusterId%colors.size());
-    geometry_msgs::Pose pose;
-    pose.position.x = box.x_max;
-    // pose.position.y = box.bboxTransform(1);
-    // pose.position.z = box.bboxTransform(2);
-    // pose.orientation.x = box.bboxQuaternion.x();
-    // pose.orientation.y = box.bboxQuaternion.y();
-    // pose.orientation.z = box.bboxQuaternion.z();
-    // pose.orientation.w = box.bboxQuaternion.w();
+    auto box = obstacle_detector->BoundingBox(cluster, cluster_id);
+    // Box box = obstacle_detector->MinimumBoundingBox(cluster);
 
-    curBoxes.emplace_back();
-
-    // BoxQ box = obstacle_detector->MinimumBoundingBox(cluster);
-
-    // geometry_msgs::Pose pose;
-    // pose.position.x = box.bboxTransform(0);
-    // pose.position.y = box.bboxTransform(1);
-    // pose.position.z = box.bboxTransform(2);
-    // pose.orientation.x = box.bboxQuaternion.x();
-    // pose.orientation.y = box.bboxQuaternion.y();
-    // pose.orientation.z = box.bboxQuaternion.z();
-    // pose.orientation.w = box.bboxQuaternion.w();
-
-    geometry_msgs::Pose pose_transformed;
+    geometry_msgs::Pose pose, pose_transformed;
+    pose.position.x = box.position(0);
+    pose.position.y = box.position(1);
+    pose.position.z = box.position(2);
+    pose.orientation.w = box.quaternion.w();
+    pose.orientation.x = box.quaternion.x();
+    pose.orientation.y = box.quaternion.y();
+    pose.orientation.z = box.quaternion.z();
     tf2::doTransform(pose, pose_transformed, transform_stamped);
 
     jsk_bboxes.boxes.emplace_back(transformJskBbox(box, pose_transformed));
     // autoware_objects.objects.emplace_back(transformAutowareObject(box, pose_transformed));
 
-    ++clusterId;
+    curr_boxes.emplace_back(box);
+    ++cluster_id;
   }
   pub_jsk_bboxes.publish(std::move(jsk_bboxes));
   // autoware_objects_pub.publish(std::move(autoware_objects));
@@ -179,21 +168,24 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   pub_cloud_ground.publish(std::move(ground_cloud));
   pub_cloud_clusters.publish(std::move(obstacle_cloud));
 
+  // Update previous bounding boxes
+  prev_boxes_ = std::move(curr_boxes);
 }
 
 
-
-jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const BoxQ& box, const geometry_msgs::Pose& pose_transformed)
+jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const Box& box, const geometry_msgs::Pose& pose_transformed)
 {
   jsk_recognition_msgs::BoundingBox jsk_bbox;
   // jsk_bbox.header = box->header;
   jsk_bbox.header.frame_id = bbox_target_frame_;
   jsk_bbox.pose = pose_transformed;
-  jsk_bbox.dimensions.x = box.cube_length;
-  jsk_bbox.dimensions.y = box.cube_width;
-  jsk_bbox.dimensions.z = box.cube_height;
+  jsk_bbox.dimensions.x = box.dimension(0);
+  jsk_bbox.dimensions.y = box.dimension(1);
+  jsk_bbox.dimensions.z = box.dimension(2);
+  jsk_bbox.value = 1.0f;
+  jsk_bbox.label = box.id;
   // jsk_bbox.value = box->score;
-  jsk_bbox.label = 0;
+  // jsk_bbox.label = 0;
 
   return std::move(jsk_bbox);
 }
