@@ -25,8 +25,9 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/transforms.h>
 
+#include <jsk_recognition_msgs/BoundingBox.h>
+
 #include "box.hpp"
-#include "kd_tree.hpp"
 
 namespace lidar_obstacle_detector
 {
