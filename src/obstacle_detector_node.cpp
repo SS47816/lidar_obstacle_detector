@@ -41,6 +41,12 @@ class ObstacleDetectorNode
 
   float bbox_filter_size_;
   std::string bbox_target_frame_;
+  // Filter the inputCloud
+  float max_length = 30.0;
+  float max_width = 10.0;
+  float pos_height = 1.0;
+  float neg_height = 2.0;
+
   ros::NodeHandle nh;
   tf2_ros::Buffer tf2_buffer;
   tf2_ros::TransformListener tf2_listener;
@@ -55,7 +61,7 @@ class ObstacleDetectorNode
   // jsk_recognition_msgs::BoundingBox transformJskBbox(const lidar_obstacle_detector::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed);
   // autoware_msgs::DetectedObject transformAutowareObject(const lidar_obstacle_detector::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed);
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud2);
   
 };
 
@@ -85,10 +91,13 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
   obstacle_detector = std::make_shared<ObstacleDetector<pcl::PointXYZ>>();
 }
 
-void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& pointcloud)
+void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points)
 {
   ROS_INFO("lidar points recieved");
-  auto raw_cloud = rosPointCloud2toPCL(pointcloud);
+  auto raw_cloud = rosPointCloud2toPCL(lidar_points);
+
+  // Downsampleing, ROI, and removing the car roof
+  auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, 0.2, Eigen::Vector4f(-max_length, -max_width, -neg_height, 1), Eigen::Vector4f(max_length, max_width, pos_height, 1));
 
   // Segment the groud plane and obstacles
   std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmentCloud = obstacle_detector->SegmentPlane(raw_cloud, 100, 0.2);
@@ -102,7 +111,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   for (auto cluster : cloudClusters)
   {
     // Render Clusters
-    std::cout << "cluster size ";
+    std::cout << "cluster size: ";
     obstacle_detector->numPoints(cluster);
     // renderPointCloud(viewer, cluster, "obstCloud" + std::to_string(clusterId), colors[clusterId]);
     
@@ -115,17 +124,15 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
     ++clusterId;
   }
 
-  ROS_INFO("lidar points publishing");
   pub_cloud_ground.publish(segmentCloud.first);
   pub_cloud_clusters.publish(segmentCloud.second);
-  ROS_INFO("lidar points published");
 }
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr ObstacleDetectorNode::rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud)
+pcl::PointCloud<pcl::PointXYZ>::Ptr ObstacleDetectorNode::rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud2)
 {
   // Covert to pcl point cloud
   pcl::PCLPointCloud2 pcl_pc2;
-  pcl_conversions::toPCL(*pointcloud, pcl_pc2);
+  pcl_conversions::toPCL(*pointcloud2, pcl_pc2);
   pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromPCLPointCloud2(pcl_pc2, *raw_cloud);
   return raw_cloud;
