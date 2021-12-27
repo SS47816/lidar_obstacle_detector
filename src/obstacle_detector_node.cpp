@@ -82,8 +82,8 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
   // ROS_ASSERT(private_nh.getParam("autoware_objects_topic", autoware_objects_topic));
 
   sub_lidar_points = nh.subscribe(lidar_points_topic, 1, &ObstacleDetectorNode::lidarPointsCallback, this);
-  pub_cloud_ground = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>(cloud_ground_topic, 1);
-  pub_cloud_clusters = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>(cloud_clusters_topic, 1);
+  pub_cloud_ground = nh.advertise<sensor_msgs::PointCloud2>(cloud_ground_topic, 1);
+  pub_cloud_clusters = nh.advertise<sensor_msgs::PointCloud2>(cloud_clusters_topic, 1);
   // jsk_bboxes_pub = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>(jsk_bboxes_topic, 1);
   // autoware_objects_pub = nh.advertise<autoware_msgs::DetectedObjectArray>(autoware_objects_topic, 1);
 
@@ -94,7 +94,9 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points)
 {
   ROS_INFO("lidar points recieved");
-  auto raw_cloud = rosPointCloud2toPCL(lidar_points);
+  // auto raw_cloud = rosPointCloud2toPCL(lidar_points);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*lidar_points, *raw_cloud);
 
   // Downsampleing, ROI, and removing the car roof
   auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, 0.2, Eigen::Vector4f(-max_length, -max_width, -neg_height, 1), Eigen::Vector4f(max_length, max_width, pos_height, 1));
@@ -124,17 +126,29 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
     ++clusterId;
   }
 
-  pub_cloud_ground.publish(segmentCloud.first);
-  pub_cloud_clusters.publish(segmentCloud.second);
+  sensor_msgs::PointCloud2::Ptr ground_cloud(new sensor_msgs::PointCloud2);
+  pcl::toROSMsg(*(segmentCloud.first), *ground_cloud);
+  ground_cloud->header = lidar_points->header;
+
+  sensor_msgs::PointCloud2::Ptr obstacle_cloud(new sensor_msgs::PointCloud2);
+  pcl::toROSMsg(*(segmentCloud.first), *obstacle_cloud);
+  obstacle_cloud->header = lidar_points->header;
+
+  pub_cloud_ground.publish(ground_cloud);
+  pub_cloud_clusters.publish(obstacle_cloud);
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ObstacleDetectorNode::rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud2)
 {
   // Covert to pcl point cloud
-  pcl::PCLPointCloud2 pcl_pc2;
-  pcl_conversions::toPCL(*pointcloud2, pcl_pc2);
+  // pcl::PCLPointCloud2 pcl_pc2;
+  // pcl_conversions::toPCL(*pointcloud2, pcl_pc2);
+  // pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  // pcl::fromPCLPointCloud2(pcl_pc2, *raw_cloud);
+
   pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromPCLPointCloud2(pcl_pc2, *raw_cloud);
+  pcl::fromROSMsg(*pointcloud2, *raw_cloud);
+
   return raw_cloud;
 }
 
