@@ -22,9 +22,10 @@
 #include <jsk_recognition_msgs/BoundingBoxArray.h>
 #include <autoware_msgs/DetectedObjectArray.h>
 
+#include <pcl_ros/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-#include "obstacle_detector.hpp"
+#include "lidar_obstacle_detector/obstacle_detector.hpp"
 
 namespace lidar_obstacle_detector 
 {
@@ -54,7 +55,7 @@ class ObstacleDetectorNode
   // jsk_recognition_msgs::BoundingBox transformJskBbox(const lidar_obstacle_detector::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed);
   // autoware_msgs::DetectedObject transformAutowareObject(const lidar_obstacle_detector::Detection3D::ConstPtr& lgsvl_detection3d, const geometry_msgs::Pose& pose_transformed);
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr ObstacleDetectorNode::rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud);
   
 };
 
@@ -75,6 +76,8 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
   // ROS_ASSERT(private_nh.getParam("autoware_objects_topic", autoware_objects_topic));
 
   sub_lidar_points = nh.subscribe(lidar_points_topic, 1, &ObstacleDetectorNode::lidarPointsCallback, this);
+  pub_cloud_ground = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>(cloud_ground_topic, 1);
+  pub_cloud_clusters = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>(cloud_clusters_topic, 1);
   // jsk_bboxes_pub = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>(jsk_bboxes_topic, 1);
   // autoware_objects_pub = nh.advertise<autoware_msgs::DetectedObjectArray>(autoware_objects_topic, 1);
 
@@ -84,7 +87,7 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 
 void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& pointcloud)
 {
-  ROS_DEBUG("lidar_points_recieved");
+  ROS_INFO("lidar points recieved");
   auto raw_cloud = rosPointCloud2toPCL(pointcloud);
 
   // Segment the groud plane and obstacles
@@ -111,16 +114,20 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
 
     ++clusterId;
   }
+
+  ROS_INFO("lidar points publishing");
+  pub_cloud_ground.publish(segmentCloud.first);
+  pub_cloud_clusters.publish(segmentCloud.second);
+  ROS_INFO("lidar points published");
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ObstacleDetectorNode::rosPointCloud2toPCL(const sensor_msgs::PointCloud2::ConstPtr& pointcloud)
 {
   // Covert to pcl point cloud
-  std::shared_ptr<pcl::PCLPointCloud2> pcl_pc2;
-  pcl_conversions::toPCL(*pointcloud, *pcl_pc2);
+  pcl::PCLPointCloud2 pcl_pc2;
+  pcl_conversions::toPCL(*pointcloud, pcl_pc2);
   pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromPCLPointCloud2(*pcl_pc2, *raw_cloud);
-
+  pcl::fromPCLPointCloud2(pcl_pc2, *raw_cloud);
   return raw_cloud;
 }
 
