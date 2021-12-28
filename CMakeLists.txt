@@ -10,6 +10,7 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
+  dynamic_reconfigure
   std_msgs
   pcl_ros
   tf2_ros
@@ -92,10 +93,9 @@ find_package(catkin REQUIRED COMPONENTS
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+generate_dynamic_reconfigure_options(
+  cfg/obstacle_detector.cfg
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -107,10 +107,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES lidar_obstacle_detector
-#  CATKIN_DEPENDS roscpp rospy std_msgs
-#  DEPENDS system_lib
+  INCLUDE_DIRS include
+  LIBRARIES lidar_obstacle_detector
+  CATKIN_DEPENDS roscpp rospy std_msgs
+  DEPENDS system_lib
 )
 
 ###########
@@ -122,12 +122,12 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake
 )
 
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
   include/${PROJECT_NAME}/box.hpp
-  include/${PROJECT_NAME}/kd_tree.hpp
   include/${PROJECT_NAME}/obstacle_detector.hpp
 )
 
@@ -153,12 +153,15 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 add_dependencies(obstacle_detector_node 
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
+  obstacle_detector_gencfg
+  ${PROJECT_NAME}
 )
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(obstacle_detector_node
   ${catkin_LIBRARIES}
   ${${PROJECT_NAME}_LIBRARY}
+  ${PROJECT_NAME}
 )
 
 #############
