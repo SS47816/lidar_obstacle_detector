@@ -28,13 +28,9 @@
 namespace lidar_obstacle_detector 
 {
 
-// Dynamic parameter server callback function
-void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& config, uint32_t level)
-{
-  // Hyperparameters for output path
-  OUTPUT_PATH_MAX_SIZE = config.output_path_max_size;
-  OUTPUT_PATH_MIN_SIZE = config.output_path_min_size;
-}
+// Pointcloud Filtering Parameters
+float VOXEL_GRID_SIZE;
+Eigen::Vector4f ROI_MAX_POINT, ROI_MIN_POINT;
 
 class ObstacleDetectorNode
 {
@@ -45,15 +41,14 @@ class ObstacleDetectorNode
  private:
   
   // Filter the inputCloud
-  float max_length = 30.0;
-  float max_width = 10.0;
-  float pos_height = 1.0;
-  float neg_height = 2.0;
+  // float max_length = 30.0;
+  // float max_width = 10.0;
+  // float pos_height = 1.0;
+  // float neg_height = 2.0;
   
   std::string bbox_target_frame_;
 
   std::vector<Box> prev_boxes_;
-
   std::shared_ptr<ObstacleDetector<pcl::PointXYZ>> obstacle_detector;
 
   ros::NodeHandle nh;
@@ -72,6 +67,15 @@ class ObstacleDetectorNode
   jsk_recognition_msgs::BoundingBox transformJskBbox(const Box& box, const geometry_msgs::Pose& pose_transformed);
   autoware_msgs::DetectedObject transformAutowareObject(const Box& box, const geometry_msgs::Pose& pose_transformed);
 };
+
+// Dynamic parameter server callback function
+void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& config, uint32_t level)
+{
+  // Pointcloud Filtering Parameters
+  VOXEL_GRID_SIZE = config.voxel_grid_size;
+  ROI_MAX_POINT = Eigen::Vector4f(config.roi_max_x, config.roi_max_y, config.roi_max_z, 1);
+  ROI_MIN_POINT = Eigen::Vector4f(config.roi_min_x, config.roi_min_y, config.roi_min_z, 1);
+}
 
 ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 {
@@ -112,7 +116,8 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   pcl::fromROSMsg(*lidar_points, *raw_cloud);
 
   // Downsampleing, ROI, and removing the car roof
-  auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, 0.2, Eigen::Vector4f(-max_length, -max_width, -neg_height, 1), Eigen::Vector4f(max_length, max_width, pos_height, 1));
+  // auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, 0.2, Eigen::Vector4f(-max_length, -max_width, -neg_height, 1), Eigen::Vector4f(max_length, max_width, pos_height, 1));
+  auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT);
 
   // Segment the groud plane and obstacles
   std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmentCloud = obstacle_detector->SegmentPlane(raw_cloud, 100, 0.2);
