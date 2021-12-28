@@ -8,8 +8,12 @@
     <param name="cloud_ground_topic"                  value="/detection/lidar_detector/cloud_ground"/>
     <param name="cloud_clusters_topic"                value="/detection/lidar_detector/cloud_clusters"/>
     <param name="jsk_bboxes_topic"                    value="/detection/lidar_detector/jsk_bboxes"/>
+    <param name="autoware_objects_topic"              value="/detection/lidar_detector/objects"/>
     <!-- Parameters -->
     <param name="bbox_target_frame"                   value="base_link"/>
   </node>
+
+  <!-- Autoware Object Visualizer -->
+  <node ns="/detection/lidar_detector" pkg="lgsvl_utils" type="detected_objects_visualizer" name="autoware_objects_visualizer" output="log" respawn="true" />
 
 </launch>
