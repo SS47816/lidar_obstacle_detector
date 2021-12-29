@@ -34,6 +34,7 @@ Eigen::Vector4f ROI_MAX_POINT, ROI_MIN_POINT;
 float GROUND_THRESH;
 float CLUSTER_THRESH;
 int CLUSTER_MAX_SIZE, CLUSTER_MIN_SIZE;
+float DISPLACEMENT_THRESH, IOU_THRESH;
 
 class ObstacleDetectorNode
 {
@@ -43,6 +44,7 @@ class ObstacleDetectorNode
 
  private:
   
+  int obstacle_id_;
   std::string bbox_target_frame_;
 
   std::vector<Box> prev_boxes_;
@@ -76,6 +78,8 @@ void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& con
   CLUSTER_THRESH = config.cluster_threshold;
   CLUSTER_MAX_SIZE = config.cluster_max_size;
   CLUSTER_MIN_SIZE = config.cluster_min_size;
+  DISPLACEMENT_THRESH = config.displacement_threshold;
+  IOU_THRESH = config.iou_threshold;
 }
 
 ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
@@ -107,7 +111,7 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 
   // Create point processor
   obstacle_detector = std::make_shared<ObstacleDetector<pcl::PointXYZ>>();
-
+  obstacle_id_ = 0;
 }
 
 void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points)
@@ -144,14 +148,22 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   autoware_objects.header = lidar_points->header;
   autoware_objects.header.frame_id = bbox_target_frame_;
 
-  int cluster_id = 0;
   std::vector<Box> curr_boxes;
   for (auto& cluster : cloudClusters)
   {
     // Create Bounding Boxes
-    auto box = obstacle_detector->BoundingBox(cluster, cluster_id);
+    auto box = obstacle_detector->BoundingBox(cluster, obstacle_id_);
     // Box box = obstacle_detector->MinimumBoundingBox(cluster);
 
+    obstacle_id_ = obstacle_id_ > INT_MAX? 0 : ++obstacle_id_;
+    curr_boxes.emplace_back(box);
+  }
+
+  // Reassign Box ids based on tracking result
+  obstacle_detector->obstacleTracking(prev_boxes_, curr_boxes, DISPLACEMENT_THRESH, IOU_THRESH);
+
+  for (auto& box : curr_boxes)
+  {
     geometry_msgs::Pose pose, pose_transformed;
     pose.position.x = box.position(0);
     pose.position.y = box.position(1);
@@ -164,12 +176,12 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
 
     jsk_bboxes.boxes.emplace_back(transformJskBbox(box, pose_transformed));
     autoware_objects.objects.emplace_back(transformAutowareObject(box, pose_transformed));
-
-    curr_boxes.emplace_back(box);
-    ++cluster_id;
   }
   pub_jsk_bboxes.publish(std::move(jsk_bboxes));
   pub_autoware_objects.publish(std::move(autoware_objects));
+
+  // Update previous bounding boxes
+  prev_boxes_ = std::move(curr_boxes);
 
   sensor_msgs::PointCloud2::Ptr ground_cloud(new sensor_msgs::PointCloud2);
   pcl::toROSMsg(*(segmentCloud.second), *ground_cloud);
@@ -181,9 +193,6 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
 
   pub_cloud_ground.publish(std::move(ground_cloud));
   pub_cloud_clusters.publish(std::move(obstacle_cloud));
-
-  // Update previous bounding boxes
-  prev_boxes_ = std::move(curr_boxes);
 }
 
 
