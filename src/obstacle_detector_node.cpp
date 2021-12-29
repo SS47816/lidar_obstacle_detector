@@ -31,6 +31,7 @@ namespace lidar_obstacle_detector
 // Pointcloud Filtering Parameters
 float VOXEL_GRID_SIZE;
 Eigen::Vector4f ROI_MAX_POINT, ROI_MIN_POINT;
+float GROUND_ESTIMATE_THRESH;
 
 class ObstacleDetectorNode
 {
@@ -39,12 +40,6 @@ class ObstacleDetectorNode
   virtual ~ObstacleDetectorNode() {};
 
  private:
-  
-  // Filter the inputCloud
-  // float max_length = 30.0;
-  // float max_width = 10.0;
-  // float pos_height = 1.0;
-  // float neg_height = 2.0;
   
   std::string bbox_target_frame_;
 
@@ -116,7 +111,6 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   pcl::fromROSMsg(*lidar_points, *raw_cloud);
 
   // Downsampleing, ROI, and removing the car roof
-  // auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, 0.2, Eigen::Vector4f(-max_length, -max_width, -neg_height, 1), Eigen::Vector4f(max_length, max_width, pos_height, 1));
   auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT);
 
   // Segment the groud plane and obstacles
