@@ -104,7 +104,7 @@ typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::FilterCloud(cons
   region.setInputCloud(cloudFiltered);
   region.filter(*cloudRegion);
 
-  // Removing the car roof (hand-crafted region)
+  // Removing the car roof region
   std::vector<int> indices;
   pcl::CropBox<PointT> roof(true);
   roof.setMin(Eigen::Vector4f(-1.5, -1.7, -1, 1));
