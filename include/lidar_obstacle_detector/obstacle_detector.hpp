@@ -37,7 +37,7 @@ class ObstacleDetector
   ObstacleDetector();
   virtual ~ObstacleDetector();
 
-  // ****************** Tracking ***********************
+  // ****************** Detection ***********************
 
   typename pcl::PointCloud<PointT>::Ptr FilterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filterRes, const Eigen::Vector4f& minPoint, const Eigen::Vector4f& maxPoint);
   
@@ -51,25 +51,29 @@ class ObstacleDetector
 
   // ****************** Tracking ***********************
 
+  void obstacleTracking(const std::vector<Box>& prev_boxes, std::vector<Box>& curr_boxes, const float displacement_thresh, const float iou_thresh);
+
  private:
+
+  // ****************** Detection ***********************
   
   std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SeparateClouds(const pcl::PointIndices::ConstPtr& inliers, const typename pcl::PointCloud<PointT>::ConstPtr& cloud);
 
   // ****************** Tracking ***********************
 
-  bool compareBoxes(const Box& a, const Box& b, const float displacementTol, const float dimensionTol);
+  bool compareBoxes(const Box& a, const Box& b, const float displacement_thresh, const float iou_thresh);
 
   // Link nearby bounding boxes between the previous and previous frame
-  std::vector<std::vector<int>> associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curBoxes, const float displacementTol, const float dimensionTol);
+  std::vector<std::vector<int>> associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curBoxes, const float displacement_thresh, const float iou_thresh);
 
   // Connection Matrix
-  std::vector<std::vector<int>> connectionMatrix(const std::vector<std::vector<int>>& connectionPairs, std::vector<int>& left, std::vector<int>& right);
+  std::vector<std::vector<int>> connectionMatrix(const std::vector<std::vector<int>>& connection_pairs, std::vector<int>& left, std::vector<int>& right);
 
   // Helper function for Hungarian Algorithm
-  bool hungarianFind(const int i, const std::vector<std::vector<int>>& connectionMatrix, std::vector<bool>& right_connected, std::vector<int>& right_pair);
+  bool hungarianFind(const int i, const std::vector<std::vector<int>>& connection_matrix, std::vector<bool>& right_connected, std::vector<int>& right_pair);
 
   // Customized Hungarian Algorithm
-  std::vector<int> hungarian(const std::vector<std::vector<int>>& connectionMatrix);
+  std::vector<int> hungarian(const std::vector<std::vector<int>>& connection_matrix);
 
   // Helper function for searching the box index in boxes given an id
   int searchBoxIndex(const std::vector<Box>& Boxes, const int id);
@@ -302,9 +306,54 @@ Box ObstacleDetector<PointT>::MinimumBoundingBox(const typename pcl::PointCloud<
 }
 
 // ************************* Tracking ***************************
+template <typename PointT>
+void ObstacleDetector<PointT>::obstacleTracking(const std::vector<Box>& prev_boxes, std::vector<Box>& curr_boxes, const float displacement_thresh, const float iou_thresh)
+{
+  // Tracking (based on the change in size and displacement between frames)
+  
+  if (curr_boxes.empty() || prev_boxes.empty())
+  {
+    return;
+  }
+  else
+  {
+    // vectors containing the id of boxes in left and right sets
+    std::vector<int> pre_ids;
+    std::vector<int> cur_ids;
+    std::vector<int> matches;
+
+    // Associate Boxes that are similar in two frames
+    auto connection_pairs = associateBoxes(prev_boxes, curr_boxes, displacement_thresh, iou_thresh);
+
+    if (connection_pairs.empty()) return;
+
+    // Construct the connection matrix for Hungarian Algorithm's use
+    auto connection_matrix = connectionMatrix(connection_pairs, pre_ids, cur_ids);
+
+    // Use Hungarian Algorithm to solve for max-matching
+    matches = hungarian(connection_matrix);
+
+    for (int j = 0; j < matches.size(); ++j)
+    {
+      // find the index of the previous box that the current box corresponds to
+      const auto pre_id = pre_ids[matches[j]];
+      const auto pre_index = searchBoxIndex(prev_boxes, pre_id);
+      
+      // find the index of the current box that needs to be changed
+      const auto cur_id = cur_ids[j]; // right and matches has the same size
+      const auto cur_index = searchBoxIndex(curr_boxes, cur_id);
+      
+      if (pre_index > -1 && cur_index > -1)
+      {
+        // change the id of the current box to the same as the previous box
+        curr_boxes[cur_index].id = prev_boxes[pre_index].id;
+      }
+    }
+  }
+}
 
 template <typename PointT>
-bool ObstacleDetector<PointT>::compareBoxes(const Box& a, const Box& b, const float displacementTol, const float dimensionTol)
+bool ObstacleDetector<PointT>::compareBoxes(const Box& a, const Box& b, const float displacement_thresh, const float iou_thresh)
 {
   // Percetage Displacements ranging between [0.0, +oo]
   const float dis = sqrt((a.position[0] - b.position[0]) * (a.position[0] - b.position[0]) + (a.position[1] - b.position[1]) * (a.position[1] - b.position[1]) + (a.position[2] - b.position[2]) * (a.position[2] - b.position[2]));
@@ -318,7 +367,7 @@ bool ObstacleDetector<PointT>::compareBoxes(const Box& a, const Box& b, const fl
   const float y_dim = 2 * (a.dimension[1] - b.dimension[1]) / (a.dimension[1] + b.dimension[1]);
   const float z_dim = 2 * (a.dimension[2] - b.dimension[2]) / (a.dimension[2] + b.dimension[2]);
 
-  if (ctr_dis <= displacementTol && x_dim <= dimensionTol && y_dim <= dimensionTol && z_dim <= dimensionTol)
+  if (ctr_dis <= displacement_thresh && x_dim <= iou_thresh && y_dim <= iou_thresh && z_dim <= iou_thresh)
   {
     return true;
   }
@@ -329,30 +378,30 @@ bool ObstacleDetector<PointT>::compareBoxes(const Box& a, const Box& b, const fl
 }
 
 template <typename PointT>
-std::vector<std::vector<int>> ObstacleDetector<PointT>::associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curBoxes, const float displacementTol, const float dimensionTol)
+std::vector<std::vector<int>> ObstacleDetector<PointT>::associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curBoxes, const float displacement_thresh, const float iou_thresh)
 {
-  std::vector<std::vector<int>> connectionPairs;
+  std::vector<std::vector<int>> connection_pairs;
 
   for (auto& prev_box : prev_boxes)
   {
     for (auto& curBox : curBoxes)
     {
       // Add the indecies of a pair of similiar boxes to the matrix
-      if (this->compareBoxes(curBox, prev_box, displacementTol, dimensionTol))
+      if (this->compareBoxes(curBox, prev_box, displacement_thresh, iou_thresh))
       {
-        connectionPairs.push_back({prev_box.id, curBox.id});
+        connection_pairs.push_back({prev_box.id, curBox.id});
       }
     }
   }
 
-  return connectionPairs;
+  return connection_pairs;
 }
 
 template <typename PointT>
-std::vector<std::vector<int>> ObstacleDetector<PointT>::connectionMatrix(const std::vector<std::vector<int>>& connectionPairs, std::vector<int>& left, std::vector<int>& right)
+std::vector<std::vector<int>> ObstacleDetector<PointT>::connectionMatrix(const std::vector<std::vector<int>>& connection_pairs, std::vector<int>& left, std::vector<int>& right)
 {
-  // Hash the box ids in the connectionPairs to two vectors(sets), left and right
-  for (auto& pair : connectionPairs)
+  // Hash the box ids in the connection_pairs to two vectors(sets), left and right
+  for (auto& pair : connection_pairs)
   {
     bool left_found = false;
     for (auto i : left)
@@ -373,9 +422,9 @@ std::vector<std::vector<int>> ObstacleDetector<PointT>::connectionMatrix(const s
       right.push_back(pair[1]);
   }
 
-  std::vector<std::vector<int>> connectionMatrix(left.size(), std::vector<int>(right.size(), 0));
+  std::vector<std::vector<int>> connection_matrix(left.size(), std::vector<int>(right.size(), 0));
 
-  for (auto& pair : connectionPairs)
+  for (auto& pair : connection_pairs)
   {
     int left_index = -1;
     for (int i = 0; i < left.size(); ++i)
@@ -392,22 +441,22 @@ std::vector<std::vector<int>> ObstacleDetector<PointT>::connectionMatrix(const s
     }
 
     if (left_index != -1 && right_index != -1)
-      connectionMatrix[left_index][right_index] = 1;
+      connection_matrix[left_index][right_index] = 1;
   }
 
-  return connectionMatrix;
+  return connection_matrix;
 }
 
 template <typename PointT>
-bool ObstacleDetector<PointT>::hungarianFind(const int i, const std::vector<std::vector<int>>& connectionMatrix, std::vector<bool>& right_connected, std::vector<int>& right_pair)
+bool ObstacleDetector<PointT>::hungarianFind(const int i, const std::vector<std::vector<int>>& connection_matrix, std::vector<bool>& right_connected, std::vector<int>& right_pair)
 {
-  for (int j = 0; j < connectionMatrix[0].size(); ++j)
+  for (int j = 0; j < connection_matrix[0].size(); ++j)
   {
-    if (connectionMatrix[i][j] == 1 && right_connected[j] == false)
+    if (connection_matrix[i][j] == 1 && right_connected[j] == false)
     {
       right_connected[j] = true;
 
-      if (right_pair[j] == -1 || hungarianFind(right_pair[j], connectionMatrix, right_connected, right_pair))
+      if (right_pair[j] == -1 || hungarianFind(right_pair[j], connection_matrix, right_connected, right_pair))
       {
         right_pair[j] = i;
         return true;
@@ -417,15 +466,15 @@ bool ObstacleDetector<PointT>::hungarianFind(const int i, const std::vector<std:
 }
 
 template <typename PointT>
-std::vector<int> ObstacleDetector<PointT>::hungarian(const std::vector<std::vector<int>>& connectionMatrix)
+std::vector<int> ObstacleDetector<PointT>::hungarian(const std::vector<std::vector<int>>& connection_matrix)
 {
-  std::vector<bool> right_connected(connectionMatrix[0].size(), false);
-  std::vector<int> right_pair(connectionMatrix[0].size(), -1);
+  std::vector<bool> right_connected(connection_matrix[0].size(), false);
+  std::vector<int> right_pair(connection_matrix[0].size(), -1);
 
   int count = 0;
-  for (int i = 0; i < connectionMatrix.size(); ++i)
+  for (int i = 0; i < connection_matrix.size(); ++i)
   {
-    if (hungarianFind(i, connectionMatrix, right_connected, right_pair))
+    if (hungarianFind(i, connection_matrix, right_connected, right_pair))
       count++;
   }
 
