@@ -31,7 +31,9 @@ namespace lidar_obstacle_detector
 // Pointcloud Filtering Parameters
 float VOXEL_GRID_SIZE;
 Eigen::Vector4f ROI_MAX_POINT, ROI_MIN_POINT;
-float GROUND_ESTIMATE_THRESH;
+float GROUND_THRESH;
+float CLUSTER_THRESH;
+int CLUSTER_MAX_SIZE, CLUSTER_MIN_SIZE;
 
 class ObstacleDetectorNode
 {
@@ -70,6 +72,10 @@ void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& con
   VOXEL_GRID_SIZE = config.voxel_grid_size;
   ROI_MAX_POINT = Eigen::Vector4f(config.roi_max_x, config.roi_max_y, config.roi_max_z, 1);
   ROI_MIN_POINT = Eigen::Vector4f(config.roi_min_x, config.roi_min_y, config.roi_min_z, 1);
+  GROUND_THRESH = config.ground_threshold;
+  CLUSTER_THRESH = config.cluster_threshold;
+  CLUSTER_MAX_SIZE = config.cluster_max_size;
+  CLUSTER_MIN_SIZE = config.cluster_min_size;
 }
 
 ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
@@ -114,10 +120,10 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT);
 
   // Segment the groud plane and obstacles
-  std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmentCloud = obstacle_detector->SegmentPlane(raw_cloud, 100, 0.2);
+  std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmentCloud = obstacle_detector->SegmentPlane(filtered_cloud, 30, GROUND_THRESH);
 
   // Cluster objects
-  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->Clustering(segmentCloud.first, 1.0, 3, 30);
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->Clustering(segmentCloud.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
   
   // Construct Bounding Boxes from the clusters
   geometry_msgs::TransformStamped transform_stamped;
