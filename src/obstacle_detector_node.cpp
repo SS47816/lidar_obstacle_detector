@@ -63,6 +63,7 @@ class ObstacleDetectorNode
   ros::Publisher pub_autoware_objects;
 
   void lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points);
+  void publishClouds(const std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr>&& segmented_clouds, const std_msgs::Header& header);
   jsk_recognition_msgs::BoundingBox transformJskBbox(const Box& box, const geometry_msgs::Pose& pose_transformed);
   autoware_msgs::DetectedObject transformAutowareObject(const Box& box, const geometry_msgs::Pose& pose_transformed);
 };
@@ -124,11 +125,14 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT);
 
   // Segment the groud plane and obstacles
-  std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmentCloud = obstacle_detector->SegmentPlane(filtered_cloud, 30, GROUND_THRESH);
+  std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmented_clouds = obstacle_detector->SegmentPlane(filtered_cloud, 30, GROUND_THRESH);
 
   // Cluster objects
-  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->Clustering(segmentCloud.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->Clustering(segmented_clouds.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
   
+  // Publish ground cloud and obstacle cloud
+  publishClouds(std::move(segmented_clouds), lidar_points->header);
+
   // Construct Bounding Boxes from the clusters
   geometry_msgs::TransformStamped transform_stamped;
   try
@@ -183,19 +187,21 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   // Update previous bounding boxes
   prev_boxes_.swap(curr_boxes_);
   curr_boxes_.clear();
+}
 
+void ObstacleDetectorNode::publishClouds(const std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr>&& segmented_clouds, const std_msgs::Header& header)
+{
   sensor_msgs::PointCloud2::Ptr ground_cloud(new sensor_msgs::PointCloud2);
-  pcl::toROSMsg(*(segmentCloud.second), *ground_cloud);
-  ground_cloud->header = lidar_points->header;
+  pcl::toROSMsg(*(segmented_clouds.second), *ground_cloud);
+  ground_cloud->header = header;
 
   sensor_msgs::PointCloud2::Ptr obstacle_cloud(new sensor_msgs::PointCloud2);
-  pcl::toROSMsg(*(segmentCloud.first), *obstacle_cloud);
-  obstacle_cloud->header = lidar_points->header;
+  pcl::toROSMsg(*(segmented_clouds.first), *obstacle_cloud);
+  obstacle_cloud->header = header;
 
   pub_cloud_ground.publish(std::move(ground_cloud));
   pub_cloud_clusters.publish(std::move(obstacle_cloud));
 }
-
 
 jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const Box& box, const geometry_msgs::Pose& pose_transformed)
 {
@@ -224,7 +230,6 @@ autoware_msgs::DetectedObject ObstacleDetectorNode::transformAutowareObject(cons
   autoware_object.label = "unknown";
   autoware_object.score = 1.0f;
   autoware_object.pose = pose_transformed;
-  autoware_object.pose.position.z += box.dimension(2)/2;
   autoware_object.pose_reliable = true;
   autoware_object.dimensions.x = box.dimension(0);
   autoware_object.dimensions.y = box.dimension(1);
