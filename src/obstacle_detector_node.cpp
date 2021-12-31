@@ -47,7 +47,7 @@ class ObstacleDetectorNode
   int obstacle_id_;
   std::string bbox_target_frame_;
 
-  std::vector<Box> prev_boxes_;
+  std::vector<Box> prev_boxes_, curr_boxes_;
   std::shared_ptr<ObstacleDetector<pcl::PointXYZ>> obstacle_detector;
 
   ros::NodeHandle nh;
@@ -148,7 +148,6 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   autoware_objects.header = lidar_points->header;
   autoware_objects.header.frame_id = bbox_target_frame_;
 
-  std::vector<Box> curr_boxes;
   for (auto& cluster : cloudClusters)
   {
     // Create Bounding Boxes
@@ -156,13 +155,14 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
     // Box box = obstacle_detector->MinimumBoundingBox(cluster);
 
     obstacle_id_ = obstacle_id_ > INT_MAX? 0 : ++obstacle_id_;
-    curr_boxes.emplace_back(box);
+    curr_boxes_.emplace_back(box);
   }
 
-  // Reassign Box ids based on tracking result
-  obstacle_detector->obstacleTracking(prev_boxes_, curr_boxes, DISPLACEMENT_THRESH, IOU_THRESH);
+  // Re-assign Box ids based on tracking result
+  obstacle_detector->obstacleTracking(prev_boxes_, curr_boxes_, DISPLACEMENT_THRESH, IOU_THRESH);
 
-  for (auto& box : curr_boxes)
+  // Transform boxes from lidar frame to base_link frame, and convert to jsk and autoware msg formats
+  for (auto& box : curr_boxes_)
   {
     geometry_msgs::Pose pose, pose_transformed;
     pose.position.x = box.position(0);
@@ -181,7 +181,8 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   pub_autoware_objects.publish(std::move(autoware_objects));
 
   // Update previous bounding boxes
-  prev_boxes_ = std::move(curr_boxes);
+  prev_boxes_.swap(curr_boxes_);
+  curr_boxes_.clear();
 
   sensor_msgs::PointCloud2::Ptr ground_cloud(new sensor_msgs::PointCloud2);
   pcl::toROSMsg(*(segmentCloud.second), *ground_cloud);
