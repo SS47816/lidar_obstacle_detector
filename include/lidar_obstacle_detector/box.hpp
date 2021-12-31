@@ -18,6 +18,8 @@ struct Box
 	Eigen::Vector3f dimension;
 	Eigen::Quaternionf quaternion;
 
+	Box() {};
+
 	Box(int id, Eigen::Vector3f position, Eigen::Vector3f dimension)
 		: id(id), position(position), dimension(dimension)
 	{
