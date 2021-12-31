@@ -29,6 +29,7 @@ namespace lidar_obstacle_detector
 {
 
 // Pointcloud Filtering Parameters
+bool USE_PCA_BOX;
 float VOXEL_GRID_SIZE;
 Eigen::Vector4f ROI_MAX_POINT, ROI_MIN_POINT;
 float GROUND_THRESH;
@@ -72,6 +73,7 @@ class ObstacleDetectorNode
 void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& config, uint32_t level)
 {
   // Pointcloud Filtering Parameters
+  USE_PCA_BOX = config.use_pca_box;
   VOXEL_GRID_SIZE = config.voxel_grid_size;
   ROI_MAX_POINT = Eigen::Vector4f(config.roi_max_x, config.roi_max_y, config.roi_max_z, 1);
   ROI_MIN_POINT = Eigen::Vector4f(config.roi_min_x, config.roi_min_y, config.roi_min_z, 1);
@@ -122,13 +124,13 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   pcl::fromROSMsg(*lidar_points, *raw_cloud);
 
   // Downsampleing, ROI, and removing the car roof
-  auto filtered_cloud = obstacle_detector->FilterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT);
+  auto filtered_cloud = obstacle_detector->filterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT);
 
   // Segment the groud plane and obstacles
-  std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmented_clouds = obstacle_detector->SegmentPlane(filtered_cloud, 30, GROUND_THRESH);
+  std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmented_clouds = obstacle_detector->segmentPlane(filtered_cloud, 30, GROUND_THRESH);
 
   // Cluster objects
-  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->Clustering(segmented_clouds.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->clustering(segmented_clouds.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
   
   // Publish ground cloud and obstacle cloud
   publishClouds(std::move(segmented_clouds), lidar_points->header);
@@ -155,9 +157,16 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   for (auto& cluster : cloudClusters)
   {
     // Create Bounding Boxes
-    // auto box = obstacle_detector->BoundingBox(cluster, obstacle_id_);
-    Box box = obstacle_detector->MinimumBoundingBox(cluster, obstacle_id_);
-
+    Box box;
+    if (USE_PCA_BOX)
+    {
+      box = obstacle_detector->pcaBoundingBox(cluster, obstacle_id_);
+    }
+    else
+    {
+      box = obstacle_detector->axisAlignedBoundingBox(cluster, obstacle_id_);
+    }
+    
     obstacle_id_ = obstacle_id_ > INT_MAX? 0 : ++obstacle_id_;
     curr_boxes_.emplace_back(box);
   }
