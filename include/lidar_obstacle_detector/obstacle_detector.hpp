@@ -15,15 +15,15 @@
 #include <chrono>
 #include <unordered_set>
 
-#include <pcl/io/pcd_io.h>
 #include <pcl/common/common.h>
+#include <pcl/common/pca.h>
+#include <pcl/common/transforms.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/crop_box.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
-#include <pcl/common/transforms.h>
 
 #include "box.hpp"
 
@@ -39,7 +39,7 @@ class ObstacleDetector
 
   // ****************** Detection ***********************
 
-  typename pcl::PointCloud<PointT>::Ptr FilterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filterRes, const Eigen::Vector4f& minPoint, const Eigen::Vector4f& maxPoint);
+  typename pcl::PointCloud<PointT>::Ptr FilterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filterRes, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt);
   
   std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SegmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int maxIterations, const float distanceThreshold);
 
@@ -47,7 +47,7 @@ class ObstacleDetector
 
   Box BoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id);
 
-  Box MinimumBoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id);
+  Box MinimumBoundingBox(typename pcl::PointCloud<PointT>::Ptr& cluster, const int id);
 
   // ****************** Tracking ***********************
 
@@ -88,7 +88,7 @@ template <typename PointT>
 ObstacleDetector<PointT>::~ObstacleDetector() {}
 
 template <typename PointT>
-typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::FilterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filterRes, const Eigen::Vector4f& minPoint, const Eigen::Vector4f& maxPoint)
+typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::FilterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filterRes, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt)
 {
   // Time segmentation process
   const auto startTime = std::chrono::steady_clock::now();
@@ -103,8 +103,8 @@ typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::FilterCloud(cons
   // Cropping the ROI
   typename pcl::PointCloud<PointT>::Ptr cloudRegion(new pcl::PointCloud<PointT>);
   pcl::CropBox<PointT> region(true);
-  region.setMin(minPoint);
-  region.setMax(maxPoint);
+  region.setMin(min_pt);
+  region.setMax(max_pt);
   region.setInputCloud(cloudFiltered);
   region.filter(*cloudRegion);
 
@@ -234,73 +234,77 @@ template <typename PointT>
 Box ObstacleDetector<PointT>::BoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id)
 {
   // Find bounding box for one of the clusters
-  PointT minPoint, maxPoint;
-  pcl::getMinMax3D(*cluster, minPoint, maxPoint);
+  PointT min_pt, max_pt;
+  pcl::getMinMax3D(*cluster, min_pt, max_pt);
   
-  const Eigen::Vector3f position((maxPoint.x + minPoint.x)/2, (maxPoint.y + minPoint.y)/2, (maxPoint.z + minPoint.z)/2);
-  const Eigen::Vector3f dimension((maxPoint.x - minPoint.x), (maxPoint.y - minPoint.y), (maxPoint.z - minPoint.z));
+  const Eigen::Vector3f position((max_pt.x + min_pt.x)/2, (max_pt.y + min_pt.y)/2, (max_pt.z + min_pt.z)/2);
+  const Eigen::Vector3f dimension((max_pt.x - min_pt.x), (max_pt.y - min_pt.y), (max_pt.z - min_pt.z));
 
   return Box(id, position, dimension);
 }
 
 template <typename PointT>
-Box ObstacleDetector<PointT>::MinimumBoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id)
+Box ObstacleDetector<PointT>::MinimumBoundingBox(typename pcl::PointCloud<PointT>::Ptr& cluster, const int id)
 {
-  // Find bounding box for one of the clusters
+  // Compute the bounding box height (to be used later for recreating the box)
+  PointT min_pt, max_pt;
+  pcl::getMinMax3D(*cluster, min_pt, max_pt);
+  const float box_height = max_pt.z - min_pt.z;
+  const float box_z = (max_pt.z + min_pt.z)/2;
 
-  // Compute principal directions
-  Eigen::Vector4f pcaCentroid;
-  pcl::compute3DCentroid(*cluster, pcaCentroid);
-  Eigen::Matrix3f covariance;
-  computeCovarianceMatrixNormalized(*cluster, pcaCentroid, covariance);
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
-  Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
-  eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1)); /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
-                                                                                  ///    the signs are different and the box doesn't get correctly oriented in some cases.
-  // TODO: Limit the PCA to the grond plane
-  // eigenVectorsPCA.row(0).col(2) << 1.0f;
-  // eigenVectorsPCA.row(2).col(0) << 1.0f;
-  // // eigenVectorsPCA.row(2).col(2) << 0.0f;
-  // eigenVectorsPCA.row(2).col(1) << 1.0f;
-  // eigenVectorsPCA.row(1).col(2) << 1.0f;
+  // Compute the cluster centroid 
+  Eigen::Vector4f pca_centroid;
+  pcl::compute3DCentroid(*cluster, pca_centroid);
 
-  // Print Matrix
-  std::cout << "eigenVectorsPCA: " << std::endl;
-  for (int i = 0; i < 3; i++)
+  // Squash the cluster to x-y plane with z = centroid z 
+  // unsigned point_count = static_cast<unsigned>(cluster->size());
+  for (size_t i = 0; i < cluster->size(); ++i)
   {
-    for (int j = 0; j < 3; j++)
-    {
-      std::cout << eigenVectorsPCA.row(i).col(j) << ", ";
-    }
-    std::cout << std::endl;
+    cluster->points[i].z = pca_centroid(2);
   }
 
-  /* // Note that getting the eigenvectors can also be obtained via the PCL PCA interface with something like:
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPCAprojection (new pcl::PointCloud<pcl::PointXYZ>);
+  // // Compute principal directions
+  // Eigen::Matrix3f covariance;
+  // computeCovarianceMatrixNormalized(*cluster, pca_centroid, covariance);
+  // Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+  // Eigen::Matrix3f eigen_vectors = eigen_solver.eigenvectors();
+  // eigen_vectors.col(2) = eigen_vectors.col(0).cross(eigen_vectors.col(1)); /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
+  //                                                                                 ///    the signs are different and the box doesn't get correctly oriented in some cases.
+
+  // // Print Matrix
+  // std::cout << "eigen_vectors: " << std::endl;
+  // for (int i = 0; i < 3; i++)
+  // {
+  //   for (int j = 0; j < 3; j++)
+  //   {
+  //     std::cout << eigen_vectors.row(i).col(j) << ", ";
+  //   }
+  //   std::cout << std::endl;
+  // }
+
+  // Note that getting the eigenvectors can also be obtained via the PCL PCA interface with something like:
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pca_projected_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PCA<pcl::PointXYZ> pca;
   pca.setInputCloud(cluster);
-  pca.project(*cluster, *cloudPCAprojection);
-  std::cerr << std::endl << "EigenVectors: " << pca.getEigenVectors() << std::endl;
-  std::cerr << std::endl << "EigenValues: " << pca.getEigenValues() << std::endl;
-  // In this case, pca.getEigenVectors() gives similar eigenVectors to eigenVectorsPCA.
-  */
+  pca.project(*cluster, *pca_projected_cloud);
+  
+  auto eigen_vectors = pca.getEigenVectors();
 
   // Transform the original cloud to the origin where the principal components correspond to the axes.
-  Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
-  projectionTransform.block<3, 3>(0, 0) = eigenVectorsPCA.transpose();
-  projectionTransform.block<3, 1>(0, 3) = -1.f * (projectionTransform.block<3, 3>(0, 0) * pcaCentroid.head<3>());
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPointsProjected(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::transformPointCloud(*cluster, *cloudPointsProjected, projectionTransform);
+  // Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
+  // projectionTransform.block<3, 3>(0, 0) = eigen_vectors.transpose();
+  // projectionTransform.block<3, 1>(0, 3) = -1.f * (projectionTransform.block<3, 3>(0, 0) * pca_centroid.head<3>());
+  // pcl::PointCloud<pcl::PointXYZ>::Ptr pca_projected_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  // pcl::transformPointCloud(*cluster, *pca_projected_cloud, projectionTransform);
 
   // Get the minimum and maximum points of the transformed cloud.
-  pcl::PointXYZ minPoint, maxPoint;
-  pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
-  const Eigen::Vector3f meanDiagonal = 0.5f * (maxPoint.getVector3fMap() + minPoint.getVector3fMap());
+  pcl::getMinMax3D(*pca_projected_cloud, min_pt, max_pt);
+  const Eigen::Vector3f meanDiagonal = 0.5f * (max_pt.getVector3fMap() + min_pt.getVector3fMap());
 
   // Final transform
-  const Eigen::Quaternionf quaternion(eigenVectorsPCA); // Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
-  const Eigen::Vector3f position = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
-  const Eigen::Vector3f dimension((maxPoint.x - minPoint.x), (maxPoint.y - minPoint.y), (maxPoint.z - minPoint.z));
+  const Eigen::Quaternionf quaternion(eigen_vectors); // Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
+  const Eigen::Vector3f position = eigen_vectors * meanDiagonal + pca_centroid.head<3>();
+  const Eigen::Vector3f dimension((max_pt.x - min_pt.x), (max_pt.y - min_pt.y), box_height);
 
   return Box(id, position, dimension, quaternion);
 }

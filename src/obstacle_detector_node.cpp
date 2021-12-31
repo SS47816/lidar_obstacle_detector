@@ -155,8 +155,8 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   for (auto& cluster : cloudClusters)
   {
     // Create Bounding Boxes
-    auto box = obstacle_detector->BoundingBox(cluster, obstacle_id_);
-    // Box box = obstacle_detector->MinimumBoundingBox(cluster);
+    // auto box = obstacle_detector->BoundingBox(cluster, obstacle_id_);
+    Box box = obstacle_detector->MinimumBoundingBox(cluster, obstacle_id_);
 
     obstacle_id_ = obstacle_id_ > INT_MAX? 0 : ++obstacle_id_;
     curr_boxes_.emplace_back(box);
