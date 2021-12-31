@@ -39,15 +39,15 @@ class ObstacleDetector
 
   // ****************** Detection ***********************
 
-  typename pcl::PointCloud<PointT>::Ptr FilterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filterRes, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt);
+  typename pcl::PointCloud<PointT>::Ptr filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt);
   
-  std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SegmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int maxIterations, const float distanceThreshold);
+  std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> segmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int max_iterations, const float distance_thresh);
 
-  std::vector<typename pcl::PointCloud<PointT>::Ptr> Clustering(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float clusterTolerance, const int minSize, const int maxSize);
+  std::vector<typename pcl::PointCloud<PointT>::Ptr> clustering(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float cluster_tolerance, const int min_size, const int max_size);
 
-  Box BoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id);
+  Box axisAlignedBoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id);
 
-  Box MinimumBoundingBox(typename pcl::PointCloud<PointT>::Ptr& cluster, const int id);
+  Box pcaBoundingBox(typename pcl::PointCloud<PointT>::Ptr& cluster, const int id);
 
   // ****************** Tracking ***********************
 
@@ -57,14 +57,14 @@ class ObstacleDetector
 
   // ****************** Detection ***********************
   
-  std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SeparateClouds(const pcl::PointIndices::ConstPtr& inliers, const typename pcl::PointCloud<PointT>::ConstPtr& cloud);
+  std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> separateClouds(const pcl::PointIndices::ConstPtr& inliers, const typename pcl::PointCloud<PointT>::ConstPtr& cloud);
 
   // ****************** Tracking ***********************
 
   bool compareBoxes(const Box& a, const Box& b, const float displacement_thresh, const float iou_thresh);
 
   // Link nearby bounding boxes between the previous and previous frame
-  std::vector<std::vector<int>> associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curBoxes, const float displacement_thresh, const float iou_thresh);
+  std::vector<std::vector<int>> associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curr_boxes, const float displacement_thresh, const float iou_thresh);
 
   // Connection Matrix
   std::vector<std::vector<int>> connectionMatrix(const std::vector<std::vector<int>>& connection_pairs, std::vector<int>& left, std::vector<int>& right);
@@ -88,32 +88,32 @@ template <typename PointT>
 ObstacleDetector<PointT>::~ObstacleDetector() {}
 
 template <typename PointT>
-typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::FilterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filterRes, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt)
+typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt)
 {
   // Time segmentation process
-  const auto startTime = std::chrono::steady_clock::now();
+  const auto start_time = std::chrono::steady_clock::now();
 
   // Create the filtering object: downsample the dataset using a leaf size
   pcl::VoxelGrid<PointT> vg;
-  typename pcl::PointCloud<PointT>::Ptr cloudFiltered(new pcl::PointCloud<PointT>);
+  typename pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>);
   vg.setInputCloud(cloud);
-  vg.setLeafSize(filterRes, filterRes, filterRes);
-  vg.filter(*cloudFiltered);
+  vg.setLeafSize(filter_res, filter_res, filter_res);
+  vg.filter(*cloud_filtered);
 
   // Cropping the ROI
-  typename pcl::PointCloud<PointT>::Ptr cloudRegion(new pcl::PointCloud<PointT>);
+  typename pcl::PointCloud<PointT>::Ptr cloud_roi(new pcl::PointCloud<PointT>);
   pcl::CropBox<PointT> region(true);
   region.setMin(min_pt);
   region.setMax(max_pt);
-  region.setInputCloud(cloudFiltered);
-  region.filter(*cloudRegion);
+  region.setInputCloud(cloud_filtered);
+  region.filter(*cloud_roi);
 
   // Removing the car roof region
   std::vector<int> indices;
   pcl::CropBox<PointT> roof(true);
   roof.setMin(Eigen::Vector4f(-1.5, -1.7, -1, 1));
   roof.setMax(Eigen::Vector4f(2.6, 1.7, -0.4, 1));
-  roof.setInputCloud(cloudRegion);
+  roof.setInputCloud(cloud_roi);
   roof.filter(indices);
 
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
@@ -121,45 +121,45 @@ typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::FilterCloud(cons
     inliers->indices.push_back(point);
 
   pcl::ExtractIndices<PointT> extract;
-  extract.setInputCloud(cloudRegion);
+  extract.setInputCloud(cloud_roi);
   extract.setIndices(inliers);
   extract.setNegative(true);
-  extract.filter(*cloudRegion);
+  extract.filter(*cloud_roi);
 
-  const auto endTime = std::chrono::steady_clock::now();
-  const auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-  std::cout << "filtering took " << elapsedTime.count() << " milliseconds" << std::endl;
+  const auto end_time = std::chrono::steady_clock::now();
+  const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  std::cout << "filtering took " << elapsed_time.count() << " milliseconds" << std::endl;
 
-  return cloudRegion;
+  return cloud_roi;
 }
 
 template <typename PointT>
-std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::SeparateClouds(const pcl::PointIndices::ConstPtr& inliers, const typename pcl::PointCloud<PointT>::ConstPtr& cloud)
+std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::separateClouds(const pcl::PointIndices::ConstPtr& inliers, const typename pcl::PointCloud<PointT>::ConstPtr& cloud)
 {
-  typename pcl::PointCloud<PointT>::Ptr obstCloud(new pcl::PointCloud<PointT>());
-  typename pcl::PointCloud<PointT>::Ptr planeCloud(new pcl::PointCloud<PointT>());
+  typename pcl::PointCloud<PointT>::Ptr obstacle_cloud(new pcl::PointCloud<PointT>());
+  typename pcl::PointCloud<PointT>::Ptr ground_cloud(new pcl::PointCloud<PointT>());
 
-  // Pushback all the inliers into the planeCloud
+  // Pushback all the inliers into the ground_cloud
   for (int index : inliers->indices)
   {
-    planeCloud->points.push_back(cloud->points[index]);
+    ground_cloud->points.push_back(cloud->points[index]);
   }
 
-  // Extract the points that are not in the inliers to obstCloud
+  // Extract the points that are not in the inliers to obstacle_cloud
   pcl::ExtractIndices<PointT> extract;
   extract.setInputCloud(cloud);
   extract.setIndices(inliers);
   extract.setNegative(true);
-  extract.filter(*obstCloud);
+  extract.filter(*obstacle_cloud);
 
-  return std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr>(obstCloud, planeCloud);
+  return std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr>(obstacle_cloud, ground_cloud);
 }
 
 template <typename PointT>
-std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::SegmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int maxIterations, const float distanceThreshold)
+std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::segmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int max_iterations, const float distance_thresh)
 {
   // Time segmentation process
-  const auto startTime = std::chrono::steady_clock::now();
+  const auto start_time = std::chrono::steady_clock::now();
 
   // Find inliers for the cloud.
   pcl::SACSegmentation<PointT> seg;
@@ -169,8 +169,8 @@ std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT
   seg.setOptimizeCoefficients(true);
   seg.setModelType(pcl::SACMODEL_PLANE);
   seg.setMethodType(pcl::SAC_RANSAC);
-  seg.setMaxIterations(maxIterations);
-  seg.setDistanceThreshold(distanceThreshold);
+  seg.setMaxIterations(max_iterations);
+  seg.setDistanceThreshold(distance_thresh);
 
   // Segment the largest planar component from the input cloud
   seg.setInputCloud(cloud);
@@ -180,19 +180,19 @@ std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT
     std::cout << "Could not estimate a planar model for the given dataset." << std::endl;
   }
 
-  const auto endTime = std::chrono::steady_clock::now();
-  const auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-  std::cout << "plane segmentation took " << elapsedTime.count() << " milliseconds" << std::endl;
+  const auto end_time = std::chrono::steady_clock::now();
+  const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  std::cout << "plane segmentation took " << elapsed_time.count() << " milliseconds" << std::endl;
 
-  return SeparateClouds(inliers, cloud);
+  return separateClouds(inliers, cloud);
 }
 
 template <typename PointT>
-std::vector<typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::Clustering(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float clusterTolerance, const int minSize, const int maxSize)
+std::vector<typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::clustering(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float cluster_tolerance, const int min_size, const int max_size)
 {
 
   // Time clustering process
-  const auto startTime = std::chrono::steady_clock::now();
+  const auto start_time = std::chrono::steady_clock::now();
 
   std::vector<typename pcl::PointCloud<PointT>::Ptr> clusters;
 
@@ -200,38 +200,38 @@ std::vector<typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::Clu
   typename pcl::search::KdTree<PointT>::Ptr tree(new pcl::search::KdTree<PointT>);
   tree->setInputCloud(cloud);
 
-  std::vector<pcl::PointIndices> clusterIndices;
+  std::vector<pcl::PointIndices> cluster_indices;
   pcl::EuclideanClusterExtraction<PointT> ec;
-  ec.setClusterTolerance(clusterTolerance);
-  ec.setMinClusterSize(minSize);
-  ec.setMaxClusterSize(maxSize);
+  ec.setClusterTolerance(cluster_tolerance);
+  ec.setMinClusterSize(min_size);
+  ec.setMaxClusterSize(max_size);
   ec.setSearchMethod(tree);
   ec.setInputCloud(cloud);
-  ec.extract(clusterIndices);
+  ec.extract(cluster_indices);
 
-  for (auto& getIndices : clusterIndices)
+  for (auto& getIndices : cluster_indices)
   {
-    typename pcl::PointCloud<PointT>::Ptr cloudCluster(new pcl::PointCloud<PointT>);
+    typename pcl::PointCloud<PointT>::Ptr cluster(new pcl::PointCloud<PointT>);
 
     for (auto& index : getIndices.indices)
-      cloudCluster->points.push_back(cloud->points[index]);
+      cluster->points.push_back(cloud->points[index]);
 
-    cloudCluster->width = cloudCluster->points.size();
-    cloudCluster->height = 1;
-    cloudCluster->is_dense = true;
+    cluster->width = cluster->points.size();
+    cluster->height = 1;
+    cluster->is_dense = true;
 
-    clusters.push_back(cloudCluster);
+    clusters.push_back(cluster);
   }
 
-  const auto endTime = std::chrono::steady_clock::now();
-  const auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-  std::cout << "clustering took " << elapsedTime.count() << " milliseconds and found " << clusters.size() << " clusters" << std::endl;
+  const auto end_time = std::chrono::steady_clock::now();
+  const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  std::cout << "clustering took " << elapsed_time.count() << " milliseconds and found " << clusters.size() << " clusters" << std::endl;
 
   return clusters;
 }
 
 template <typename PointT>
-Box ObstacleDetector<PointT>::BoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id)
+Box ObstacleDetector<PointT>::axisAlignedBoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr& cluster, const int id)
 {
   // Find bounding box for one of the clusters
   PointT min_pt, max_pt;
@@ -244,7 +244,7 @@ Box ObstacleDetector<PointT>::BoundingBox(const typename pcl::PointCloud<PointT>
 }
 
 template <typename PointT>
-Box ObstacleDetector<PointT>::MinimumBoundingBox(typename pcl::PointCloud<PointT>::Ptr& cluster, const int id)
+Box ObstacleDetector<PointT>::pcaBoundingBox(typename pcl::PointCloud<PointT>::Ptr& cluster, const int id)
 {
   // Compute the bounding box height (to be used later for recreating the box)
   PointT min_pt, max_pt;
@@ -257,45 +257,18 @@ Box ObstacleDetector<PointT>::MinimumBoundingBox(typename pcl::PointCloud<PointT
   pcl::compute3DCentroid(*cluster, pca_centroid);
 
   // Squash the cluster to x-y plane with z = centroid z 
-  // unsigned point_count = static_cast<unsigned>(cluster->size());
   for (size_t i = 0; i < cluster->size(); ++i)
   {
     cluster->points[i].z = pca_centroid(2);
   }
 
-  // // Compute principal directions
-  // Eigen::Matrix3f covariance;
-  // computeCovarianceMatrixNormalized(*cluster, pca_centroid, covariance);
-  // Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
-  // Eigen::Matrix3f eigen_vectors = eigen_solver.eigenvectors();
-  // eigen_vectors.col(2) = eigen_vectors.col(0).cross(eigen_vectors.col(1)); /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
-  //                                                                                 ///    the signs are different and the box doesn't get correctly oriented in some cases.
-
-  // // Print Matrix
-  // std::cout << "eigen_vectors: " << std::endl;
-  // for (int i = 0; i < 3; i++)
-  // {
-  //   for (int j = 0; j < 3; j++)
-  //   {
-  //     std::cout << eigen_vectors.row(i).col(j) << ", ";
-  //   }
-  //   std::cout << std::endl;
-  // }
-
-  // Note that getting the eigenvectors can also be obtained via the PCL PCA interface with something like:
+  // Compute principal directions & Transform the original cloud to PCA coordinates
   pcl::PointCloud<pcl::PointXYZ>::Ptr pca_projected_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PCA<pcl::PointXYZ> pca;
   pca.setInputCloud(cluster);
   pca.project(*cluster, *pca_projected_cloud);
   
-  auto eigen_vectors = pca.getEigenVectors();
-
-  // Transform the original cloud to the origin where the principal components correspond to the axes.
-  // Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
-  // projectionTransform.block<3, 3>(0, 0) = eigen_vectors.transpose();
-  // projectionTransform.block<3, 1>(0, 3) = -1.f * (projectionTransform.block<3, 3>(0, 0) * pca_centroid.head<3>());
-  // pcl::PointCloud<pcl::PointXYZ>::Ptr pca_projected_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  // pcl::transformPointCloud(*cluster, *pca_projected_cloud, projectionTransform);
+  const auto eigen_vectors = pca.getEigenVectors();
 
   // Get the minimum and maximum points of the transformed cloud.
   pcl::getMinMax3D(*pca_projected_cloud, min_pt, max_pt);
@@ -382,13 +355,13 @@ bool ObstacleDetector<PointT>::compareBoxes(const Box& a, const Box& b, const fl
 }
 
 template <typename PointT>
-std::vector<std::vector<int>> ObstacleDetector<PointT>::associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curBoxes, const float displacement_thresh, const float iou_thresh)
+std::vector<std::vector<int>> ObstacleDetector<PointT>::associateBoxes(const std::vector<Box>& prev_boxes, const std::vector<Box>& curr_boxes, const float displacement_thresh, const float iou_thresh)
 {
   std::vector<std::vector<int>> connection_pairs;
 
   for (auto& prev_box : prev_boxes)
   {
-    for (auto& curBox : curBoxes)
+    for (auto& curBox : curr_boxes)
     {
       // Add the indecies of a pair of similiar boxes to the matrix
       if (this->compareBoxes(curBox, prev_box, displacement_thresh, iou_thresh))
