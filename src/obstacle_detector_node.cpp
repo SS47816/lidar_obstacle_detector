@@ -30,6 +30,7 @@ namespace lidar_obstacle_detector
 
 // Pointcloud Filtering Parameters
 bool USE_PCA_BOX;
+bool USE_TRACKING;
 float VOXEL_GRID_SIZE;
 Eigen::Vector4f ROI_MAX_POINT, ROI_MIN_POINT;
 float GROUND_THRESH;
@@ -45,7 +46,7 @@ class ObstacleDetectorNode
 
  private:
   
-  int obstacle_id_;
+  size_t obstacle_id_;
   std::string bbox_target_frame_;
 
   std::vector<Box> prev_boxes_, curr_boxes_;
@@ -74,6 +75,7 @@ void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& con
 {
   // Pointcloud Filtering Parameters
   USE_PCA_BOX = config.use_pca_box;
+  USE_TRACKING = config.use_tracking;
   VOXEL_GRID_SIZE = config.voxel_grid_size;
   ROI_MAX_POINT = Eigen::Vector4f(config.roi_max_x, config.roi_max_y, config.roi_max_z, 1);
   ROI_MIN_POINT = Eigen::Vector4f(config.roi_min_x, config.roi_min_y, config.roi_min_z, 1);
@@ -167,12 +169,13 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
       box = obstacle_detector->axisAlignedBoundingBox(cluster, obstacle_id_);
     }
     
-    obstacle_id_ = obstacle_id_ > INT_MAX? 0 : ++obstacle_id_;
+    obstacle_id_ = (obstacle_id_ < SIZE_MAX)? ++obstacle_id_ : 0;
     curr_boxes_.emplace_back(box);
   }
 
   // Re-assign Box ids based on tracking result
-  obstacle_detector->obstacleTracking(prev_boxes_, curr_boxes_, DISPLACEMENT_THRESH, IOU_THRESH);
+  if (USE_TRACKING)
+    obstacle_detector->obstacleTracking(prev_boxes_, curr_boxes_, DISPLACEMENT_THRESH, IOU_THRESH);
 
   // Transform boxes from lidar frame to base_link frame, and convert to jsk and autoware msg formats
   for (auto& box : curr_boxes_)

@@ -13,7 +13,10 @@
     <param name="bbox_target_frame"                   value="base_link"/>
   </node>
 
-  <!-- Autoware Object Visualizer -->
+  <!-- Dynamic Reconfigure GUI -->
+  <node name="rqt_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure" output="screen" />
+
+  <!-- Autoware Object Visualizer (if you have the `lgsvl_utils` pkg, or you can use the official Autoware one) -->
   <node ns="/detection/lidar_detector" pkg="lgsvl_utils" type="detected_objects_visualizer" name="autoware_objects_visualizer" output="log" respawn="true" />
 
 </launch>
