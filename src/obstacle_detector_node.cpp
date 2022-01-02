@@ -45,10 +45,8 @@ class ObstacleDetectorNode
   virtual ~ObstacleDetectorNode() {};
 
  private:
-  
   size_t obstacle_id_;
   std::string bbox_target_frame_;
-
   std::vector<Box> prev_boxes_, curr_boxes_;
   std::shared_ptr<ObstacleDetector<pcl::PointXYZ>> obstacle_detector;
 
@@ -122,6 +120,8 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points)
 {
   ROS_INFO("lidar points recieved");
+  const auto pointcloud_header = lidar_points->header;
+
   pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*lidar_points, *raw_cloud);
 
@@ -135,26 +135,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->clustering(segmented_clouds.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
   
   // Publish ground cloud and obstacle cloud
-  publishClouds(std::move(segmented_clouds), lidar_points->header);
-
-  // Construct Bounding Boxes from the clusters
-  geometry_msgs::TransformStamped transform_stamped;
-  try
-  {
-    transform_stamped = tf2_buffer.lookupTransform(bbox_target_frame_, lidar_points->header.frame_id, ros::Time(0));
-  }
-  catch (tf2::TransformException& ex)
-  {
-    ROS_WARN("%s", ex.what());
-    return;
-  }
-
-  jsk_recognition_msgs::BoundingBoxArray jsk_bboxes;
-  jsk_bboxes.header = lidar_points->header;
-  jsk_bboxes.header.frame_id = bbox_target_frame_;
-  autoware_msgs::DetectedObjectArray autoware_objects;
-  autoware_objects.header = lidar_points->header;
-  autoware_objects.header.frame_id = bbox_target_frame_;
+  publishClouds(std::move(segmented_clouds), pointcloud_header);
 
   for (auto& cluster : cloudClusters)
   {
@@ -176,6 +157,35 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   // Re-assign Box ids based on tracking result
   if (USE_TRACKING)
     obstacle_detector->obstacleTracking(prev_boxes_, curr_boxes_, DISPLACEMENT_THRESH, IOU_THRESH);
+
+  // Lookup for frame transform between the lidar frame and the target frame
+  geometry_msgs::TransformStamped transform_stamped;
+  try
+  {
+    transform_stamped = tf2_buffer.lookupTransform(bbox_target_frame_, pointcloud_header.frame_id, ros::Time(0));
+  }
+  catch (tf2::TransformException& ex)
+  {
+    ROS_WARN("%s", ex.what());
+    ROS_WARN("Frame Transform Given Up! Outputing obstacles in the original LiDAR frame %s instead...", pointcloud_header.frame_id.c_str());
+    try
+    {
+      transform_stamped = tf2_buffer.lookupTransform(pointcloud_header.frame_id, pointcloud_header.frame_id, ros::Time(0));
+    }
+    catch (tf2::TransformException& ex)
+    {
+      ROS_ERROR("%s", ex.what());
+      return;
+    }
+  }
+
+  // Construct Bounding Boxes from the clusters
+  jsk_recognition_msgs::BoundingBoxArray jsk_bboxes;
+  jsk_bboxes.header = pointcloud_header;
+  jsk_bboxes.header.frame_id = bbox_target_frame_;
+  autoware_msgs::DetectedObjectArray autoware_objects;
+  autoware_objects.header = pointcloud_header;
+  autoware_objects.header.frame_id = bbox_target_frame_;
 
   // Transform boxes from lidar frame to base_link frame, and convert to jsk and autoware msg formats
   for (auto& box : curr_boxes_)
@@ -218,7 +228,6 @@ void ObstacleDetectorNode::publishClouds(const std::pair<pcl::PointCloud<pcl::Po
 jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const Box& box, const geometry_msgs::Pose& pose_transformed)
 {
   jsk_recognition_msgs::BoundingBox jsk_bbox;
-  // jsk_bbox.header = box->header;
   jsk_bbox.header.frame_id = bbox_target_frame_;
   jsk_bbox.pose = pose_transformed;
   jsk_bbox.dimensions.x = box.dimension(0);
@@ -226,8 +235,6 @@ jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const B
   jsk_bbox.dimensions.z = box.dimension(2);
   jsk_bbox.value = 1.0f;
   jsk_bbox.label = box.id;
-  // jsk_bbox.value = box->score;
-  // jsk_bbox.label = 0;
 
   return std::move(jsk_bbox);
 }
@@ -236,7 +243,6 @@ jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const B
 autoware_msgs::DetectedObject ObstacleDetectorNode::transformAutowareObject(const Box& box, const geometry_msgs::Pose& pose_transformed)
 {
   autoware_msgs::DetectedObject autoware_object;
-  // autoware_object.header = box->header;
   autoware_object.header.frame_id = bbox_target_frame_;
   autoware_object.id = box.id;
   autoware_object.label = "unknown";
@@ -246,9 +252,6 @@ autoware_msgs::DetectedObject ObstacleDetectorNode::transformAutowareObject(cons
   autoware_object.dimensions.x = box.dimension(0);
   autoware_object.dimensions.y = box.dimension(1);
   autoware_object.dimensions.z = box.dimension(2);
-
-  // autoware_object.velocity = box->velocity;
-  // autoware_object.velocity_reliable = true;
   autoware_object.valid = true;
 
   return std::move(autoware_object);
