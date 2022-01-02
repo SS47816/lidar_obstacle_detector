@@ -64,8 +64,8 @@ class ObstacleDetectorNode
 
   void lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points);
   void publishClouds(const std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr>&& segmented_clouds, const std_msgs::Header& header);
-  jsk_recognition_msgs::BoundingBox transformJskBbox(const Box& box, const geometry_msgs::Pose& pose_transformed);
-  autoware_msgs::DetectedObject transformAutowareObject(const Box& box, const geometry_msgs::Pose& pose_transformed);
+  jsk_recognition_msgs::BoundingBox transformJskBbox(const Box& box, const std_msgs::Header& header, const geometry_msgs::Pose& pose_transformed);
+  autoware_msgs::DetectedObject transformAutowareObject(const Box& box, const std_msgs::Header& header, const geometry_msgs::Pose& pose_transformed);
 };
 
 // Dynamic parameter server callback function
@@ -120,7 +120,10 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points)
 {
   ROS_INFO("lidar points recieved");
+  // Time the whole process
+  const auto start_time = std::chrono::steady_clock::now();
   const auto pointcloud_header = lidar_points->header;
+  const auto bbox_source_frame = lidar_points->header.frame_id;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*lidar_points, *raw_cloud);
@@ -129,10 +132,10 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   auto filtered_cloud = obstacle_detector->filterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT);
 
   // Segment the groud plane and obstacles
-  std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmented_clouds = obstacle_detector->segmentPlane(filtered_cloud, 30, GROUND_THRESH);
+  auto segmented_clouds = obstacle_detector->segmentPlane(filtered_cloud, 30, GROUND_THRESH);
 
   // Cluster objects
-  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = obstacle_detector->clustering(segmented_clouds.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
+  auto cloudClusters = obstacle_detector->clustering(segmented_clouds.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
   
   // Publish ground cloud and obstacle cloud
   publishClouds(std::move(segmented_clouds), pointcloud_header);
@@ -159,18 +162,21 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
     obstacle_detector->obstacleTracking(prev_boxes_, curr_boxes_, DISPLACEMENT_THRESH, IOU_THRESH);
 
   // Lookup for frame transform between the lidar frame and the target frame
+  auto bbox_header = pointcloud_header;
+  bbox_header.frame_id = bbox_target_frame_;
   geometry_msgs::TransformStamped transform_stamped;
   try
   {
-    transform_stamped = tf2_buffer.lookupTransform(bbox_target_frame_, pointcloud_header.frame_id, ros::Time(0));
+    transform_stamped = tf2_buffer.lookupTransform(bbox_target_frame_, bbox_source_frame, ros::Time(0));
   }
   catch (tf2::TransformException& ex)
   {
     ROS_WARN("%s", ex.what());
-    ROS_WARN("Frame Transform Given Up! Outputing obstacles in the original LiDAR frame %s instead...", pointcloud_header.frame_id.c_str());
+    ROS_WARN("Frame Transform Given Up! Outputing obstacles in the original LiDAR frame %s instead...", bbox_source_frame.c_str());
+    bbox_header.frame_id = bbox_source_frame;
     try
     {
-      transform_stamped = tf2_buffer.lookupTransform(pointcloud_header.frame_id, pointcloud_header.frame_id, ros::Time(0));
+      transform_stamped = tf2_buffer.lookupTransform(bbox_source_frame, bbox_source_frame, ros::Time(0));
     }
     catch (tf2::TransformException& ex)
     {
@@ -181,11 +187,9 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
 
   // Construct Bounding Boxes from the clusters
   jsk_recognition_msgs::BoundingBoxArray jsk_bboxes;
-  jsk_bboxes.header = pointcloud_header;
-  jsk_bboxes.header.frame_id = bbox_target_frame_;
+  jsk_bboxes.header = bbox_header;
   autoware_msgs::DetectedObjectArray autoware_objects;
-  autoware_objects.header = pointcloud_header;
-  autoware_objects.header.frame_id = bbox_target_frame_;
+  autoware_objects.header = bbox_header;
 
   // Transform boxes from lidar frame to base_link frame, and convert to jsk and autoware msg formats
   for (auto& box : curr_boxes_)
@@ -200,8 +204,8 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
     pose.orientation.z = box.quaternion.z();
     tf2::doTransform(pose, pose_transformed, transform_stamped);
 
-    jsk_bboxes.boxes.emplace_back(transformJskBbox(box, pose_transformed));
-    autoware_objects.objects.emplace_back(transformAutowareObject(box, pose_transformed));
+    jsk_bboxes.boxes.emplace_back(transformJskBbox(box, bbox_header, pose_transformed));
+    autoware_objects.objects.emplace_back(transformAutowareObject(box, bbox_header, pose_transformed));
   }
   pub_jsk_bboxes.publish(std::move(jsk_bboxes));
   pub_autoware_objects.publish(std::move(autoware_objects));
@@ -209,6 +213,11 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   // Update previous bounding boxes
   prev_boxes_.swap(curr_boxes_);
   curr_boxes_.clear();
+
+  // Time the whole process
+  const auto end_time = std::chrono::steady_clock::now();
+  const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  ROS_INFO("The obstacle_detector_node took %.3f second", float(elapsed_time.count()/1000.0));
 }
 
 void ObstacleDetectorNode::publishClouds(const std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr>&& segmented_clouds, const std_msgs::Header& header)
@@ -225,10 +234,10 @@ void ObstacleDetectorNode::publishClouds(const std::pair<pcl::PointCloud<pcl::Po
   pub_cloud_clusters.publish(std::move(obstacle_cloud));
 }
 
-jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const Box& box, const geometry_msgs::Pose& pose_transformed)
+jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const Box& box, const std_msgs::Header& header, const geometry_msgs::Pose& pose_transformed)
 {
   jsk_recognition_msgs::BoundingBox jsk_bbox;
-  jsk_bbox.header.frame_id = bbox_target_frame_;
+  jsk_bbox.header = header;
   jsk_bbox.pose = pose_transformed;
   jsk_bbox.dimensions.x = box.dimension(0);
   jsk_bbox.dimensions.y = box.dimension(1);
@@ -240,10 +249,10 @@ jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const B
 }
 
 
-autoware_msgs::DetectedObject ObstacleDetectorNode::transformAutowareObject(const Box& box, const geometry_msgs::Pose& pose_transformed)
+autoware_msgs::DetectedObject ObstacleDetectorNode::transformAutowareObject(const Box& box, const std_msgs::Header& header, const geometry_msgs::Pose& pose_transformed)
 {
   autoware_msgs::DetectedObject autoware_object;
-  autoware_object.header.frame_id = bbox_target_frame_;
+  autoware_object.header = header;
   autoware_object.id = box.id;
   autoware_object.label = "unknown";
   autoware_object.score = 1.0f;
