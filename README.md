@@ -7,7 +7,6 @@
 ![demo_2](media/demo_2.gif)
 
 ## Features
-(This repo is still under development... )
 * Segmentation of ground plane and obstacle point clouds
 * Customizable Region of Interest (ROI) for obstacle detection
 * Customizable region for removing ego vehicle points from the point cloud
@@ -38,6 +37,26 @@ source devel/setup.bash
 
 ## Usage
 
+### (Easy) Use this pkg with ROS Bags (`mai_city` dataset as an example here)
+
+**Step 1**: Download the `mai_city` dataset from their [Official Website](https://www.ipb.uni-bonn.de/data/mai-city-dataset/)
+
+**Step 2**: Launch the node using the `mai_city.launch` file
+```bash
+# this will launch the obstacle_detector node, rviz, and rqt_reconfigure GUI together
+roslaunch lidar_obstacle_detector mai_city.launch
+```
+
+**Step 3**: Run any of the bags from the dataset
+```bash
+# go to the folder where the dataset is located
+cd mai_city/bags
+# play the rosbag
+rosbag play 00.bag
+```
+
+### Use this pkg with LGSVL Simulator (and my `lgsvl_utils` pkg)
+
 **Step 1**: Change the topic names and params in the `launch/lidar_obstacle_detector.launch` file
 
 **Step 2**: Launch using the launch file
@@ -53,6 +72,7 @@ rosrun rqt_reconfigure rqt_reconfigure
 ```
 
 ## Contribution
+Contributions are welcomed!
 
 ## License
 MIT License
