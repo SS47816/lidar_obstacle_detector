@@ -119,7 +119,7 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
 
 void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points)
 {
-  ROS_INFO("lidar points recieved");
+  ROS_DEBUG("lidar points recieved");
   // Time the whole process
   const auto start_time = std::chrono::steady_clock::now();
   const auto pointcloud_header = lidar_points->header;
@@ -217,7 +217,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   // Time the whole process
   const auto end_time = std::chrono::steady_clock::now();
   const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-  ROS_INFO("The obstacle_detector_node took %.3f second", float(elapsed_time.count()/1000.0));
+  ROS_INFO("The obstacle_detector_node found %d obstacles in %.3f second", int(prev_boxes_.size()), float(elapsed_time.count()/1000.0));
 }
 
 void ObstacleDetectorNode::publishClouds(const std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr>&& segmented_clouds, const std_msgs::Header& header)

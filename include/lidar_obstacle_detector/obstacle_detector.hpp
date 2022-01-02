@@ -91,7 +91,7 @@ template <typename PointT>
 typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt)
 {
   // Time segmentation process
-  const auto start_time = std::chrono::steady_clock::now();
+  // const auto start_time = std::chrono::steady_clock::now();
 
   // Create the filtering object: downsample the dataset using a leaf size
   pcl::VoxelGrid<PointT> vg;
@@ -126,9 +126,9 @@ typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(cons
   extract.setNegative(true);
   extract.filter(*cloud_roi);
 
-  const auto end_time = std::chrono::steady_clock::now();
-  const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-  std::cout << "filtering took " << elapsed_time.count() << " milliseconds" << std::endl;
+  // const auto end_time = std::chrono::steady_clock::now();
+  // const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  // std::cout << "filtering took " << elapsed_time.count() << " milliseconds" << std::endl;
 
   return cloud_roi;
 }
@@ -159,7 +159,7 @@ template <typename PointT>
 std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::segmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int max_iterations, const float distance_thresh)
 {
   // Time segmentation process
-  const auto start_time = std::chrono::steady_clock::now();
+  // const auto start_time = std::chrono::steady_clock::now();
 
   // Find inliers for the cloud.
   pcl::SACSegmentation<PointT> seg;
@@ -180,9 +180,9 @@ std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT
     std::cout << "Could not estimate a planar model for the given dataset." << std::endl;
   }
 
-  const auto end_time = std::chrono::steady_clock::now();
-  const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-  std::cout << "plane segmentation took " << elapsed_time.count() << " milliseconds" << std::endl;
+  // const auto end_time = std::chrono::steady_clock::now();
+  // const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  // std::cout << "plane segmentation took " << elapsed_time.count() << " milliseconds" << std::endl;
 
   return separateClouds(inliers, cloud);
 }
@@ -190,9 +190,8 @@ std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT
 template <typename PointT>
 std::vector<typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::clustering(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float cluster_tolerance, const int min_size, const int max_size)
 {
-
   // Time clustering process
-  const auto start_time = std::chrono::steady_clock::now();
+  // const auto start_time = std::chrono::steady_clock::now();
 
   std::vector<typename pcl::PointCloud<PointT>::Ptr> clusters;
 
@@ -223,9 +222,9 @@ std::vector<typename pcl::PointCloud<PointT>::Ptr> ObstacleDetector<PointT>::clu
     clusters.push_back(cluster);
   }
 
-  const auto end_time = std::chrono::steady_clock::now();
-  const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-  std::cout << "clustering took " << elapsed_time.count() << " milliseconds and found " << clusters.size() << " clusters" << std::endl;
+  // const auto end_time = std::chrono::steady_clock::now();
+  // const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  // std::cout << "clustering took " << elapsed_time.count() << " milliseconds and found " << clusters.size() << " clusters" << std::endl;
 
   return clusters;
 }
@@ -455,7 +454,7 @@ std::vector<int> ObstacleDetector<PointT>::hungarian(const std::vector<std::vect
       count++;
   }
 
-  std::cout << "For: " << right_pair.size() << " current-frame bounding boxes, found: " << count << " matches in previous frame! " << std::endl;
+  std::cout << "For: " << right_pair.size() << " current frame bounding boxes, found: " << count << " matches in previous frame! " << std::endl;
 
   return right_pair;
 }
