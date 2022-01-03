@@ -11,6 +11,7 @@
 * Customizable Region of Interest (ROI) for obstacle detection
 * Customizable region for removing ego vehicle points from the point cloud
 * Tracking of obstacles between frames using IOU gauge and Hungarian algorithm
+* In order to help you tune the parameters to suit your own applications better, all the key parameters of the algorithm are controllable in live action using the ros param dynamic reconfigure feature
 
 **TODOs**
 * 
@@ -37,11 +38,11 @@ source devel/setup.bash
 
 ## Usage
 
-### (Easy) Use this pkg with ROS Bags (`mai_city` dataset as an example here)
+### 1. (Easy) Use this pkg with ROS Bags (`mai_city` dataset as an example here)
 
 **Step 1**: Download the `mai_city` dataset from their [Official Website](https://www.ipb.uni-bonn.de/data/mai-city-dataset/)
 
-**Step 2**: Launch the node using the `mai_city.launch` file
+**Step 2**: Launch the nodes using the `mai_city.launch` launch file
 ```bash
 # this will launch the obstacle_detector node, rviz, and rqt_reconfigure GUI together
 roslaunch lidar_obstacle_detector mai_city.launch
@@ -55,24 +56,23 @@ cd mai_city/bags
 rosbag play 00.bag
 ```
 
-### Use this pkg with LGSVL Simulator (and my `lgsvl_utils` pkg)
+### 2. Use this pkg with LGSVL Simulator (with the help of the [`lgsvl_utils`](https://github.com/SS47816/lgsvl_utils) pkg)
 
 **Step 1**: Change the topic names and params in the `launch/lidar_obstacle_detector.launch` file
 
-**Step 2**: Launch using the launch file
+**Step 2**: Launch the nodes using the `mai_city.launch` launch file
 ```bash
 # launch node
 roslaunch lidar_obstacle_detector lidar_obstacle_detector.launch 
 ```
 
-**Step 3**: In order to help you tune the parameters to suit your own applications better, all the key parameters of the algorithm are controllable in live action using the ros param dynamic reconfigure feature
-```bash
-# launch 
-rosrun rqt_reconfigure rqt_reconfigure 
-```
-
 ## Contribution
-Contributions are welcomed!
+You are welcome contributing to the package by opening a pull-request
+
+We are following: 
+[Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html), 
+[C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#main), 
+and [ROS C++ Style Guide](http://wiki.ros.org/CppStyleGuide)
 
 ## License
 MIT License
