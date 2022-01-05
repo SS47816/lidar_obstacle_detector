@@ -40,6 +40,8 @@ source devel/setup.bash
 
 ### 1. (Easy) Use this pkg with ROS Bags (`mai_city` dataset as an example here)
 
+![demo_mai_city](media/mai_city_00.gif)
+
 **Step 1**: Download the `mai_city` dataset from their [Official Website](https://www.ipb.uni-bonn.de/data/mai-city-dataset/)
 
 **Step 2**: Launch the nodes using the `mai_city.launch` launch file
@@ -58,12 +60,15 @@ rosbag play 00.bag
 
 ### 2. Use this pkg with LGSVL Simulator (with the help of the [`lgsvl_utils`](https://github.com/SS47816/lgsvl_utils) pkg)
 
-**Step 1**: Change the topic names and params in the `launch/lidar_obstacle_detector.launch` file
+![demo_lgsvl](media/lgsvl.gif)
 
-**Step 2**: Launch the nodes using the `mai_city.launch` launch file
+**Step 1**: Launch the LGSVL simulator and `lgsvl_utils` nodes 
+> Please refer this step to the [`README` Usage Section](https://github.com/SS47816/lgsvl_utils) of the `lgsvl_utils` pkg
+
+**Step 2**: Launch the nodes using the `launch/lgsvl.launch` launch file
 ```bash
 # launch node
-roslaunch lidar_obstacle_detector lidar_obstacle_detector.launch 
+roslaunch lidar_obstacle_detector lgsvl.launch 
 ```
 
 ## Contribution
