@@ -14,7 +14,9 @@
 * In order to help you tune the parameters to suit your own applications better, all the key parameters of the algorithm are controllable in live action using the ros param dynamic reconfigure feature
 
 **TODOs**
-* 
+* LiDAR pointcloud motion undistortion
+* Refine PCA Bounding Boxes by L-Shape fitting
+* Add trackers such as UKF
 
 **Known Issues**
 *
