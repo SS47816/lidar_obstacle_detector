@@ -15,11 +15,12 @@
 
 **TODOs**
 * LiDAR pointcloud motion undistortion
+* Drive Space/Kurb Segmentation
 * Refine PCA Bounding Boxes by L-Shape fitting
 * Add trackers such as UKF
 
 **Known Issues**
-*
+* PCA Bounding Boxes might not be accurate in certain situations
 
 ## Dependencies
 * autoware-msgs
