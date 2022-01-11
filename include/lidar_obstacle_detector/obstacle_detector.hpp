@@ -33,7 +33,6 @@ template <typename PointT>
 class ObstacleDetector
 {
  public:
-  
   ObstacleDetector();
   virtual ~ObstacleDetector();
 
@@ -50,17 +49,13 @@ class ObstacleDetector
   Box pcaBoundingBox(typename pcl::PointCloud<PointT>::Ptr& cluster, const int id);
 
   // ****************** Tracking ***********************
-
   void obstacleTracking(const std::vector<Box>& prev_boxes, std::vector<Box>& curr_boxes, const float displacement_thresh, const float iou_thresh);
 
  private:
-
   // ****************** Detection ***********************
-  
   std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> separateClouds(const pcl::PointIndices::ConstPtr& inliers, const typename pcl::PointCloud<PointT>::ConstPtr& cloud);
 
   // ****************** Tracking ***********************
-
   bool compareBoxes(const Box& a, const Box& b, const float displacement_thresh, const float iou_thresh);
 
   // Link nearby bounding boxes between the previous and previous frame
