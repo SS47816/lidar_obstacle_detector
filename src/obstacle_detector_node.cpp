@@ -178,9 +178,9 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
     {
       transform_stamped = tf2_buffer.lookupTransform(bbox_source_frame, bbox_source_frame, ros::Time(0));
     }
-    catch (tf2::TransformException& ex)
+    catch (tf2::TransformException& ex2)
     {
-      ROS_ERROR("%s", ex.what());
+      ROS_ERROR("%s", ex2.what());
       return;
     }
   }

@@ -1,5 +1,7 @@
 # lidar_obstacle_detector
 
+![Code Grade](https://api.codiga.io/project/30668/status/svg)
+![Code Quality Score](https://api.codiga.io/project/30668/score/svg)
 [![CodeFactor](https://www.codefactor.io/repository/github/ss47816/lidar_obstacle_detector/badge)](https://www.codefactor.io/repository/github/ss47816/lidar_obstacle_detector)
 
 3D LiDAR Object Detection &amp; Tracking using Euclidean Clustering &amp; Hungarian algorithm
