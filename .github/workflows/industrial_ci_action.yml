@@ -20,11 +20,11 @@ jobs:
       # fail-fast: false # uncomment if failing jobs should not cancel the others immediately
       matrix: # matrix is the product of entries
         ROS_DISTRO: [melodic]
-        ROS_REPO: [testing, main]
+        ROS_REPO: [main] # testing, 
         # exclude: # specific configuration can be excludes
         #   - {ROS_DISTRO: melodic, ROS_REPO: testing}
-        include: # add additional configurations
-          - {ROS_DISTRO: kinetic, ROS_REPO: testing}
+        # include: # add additional configurations
+        #  - {ROS_DISTRO: kinetic, ROS_REPO: testing}
     env:
       CCACHE_DIR: "${{ github.workspace }}/.ccache" # directory for ccache (and how we enable ccache in industrial_ci)
     steps:
