@@ -153,7 +153,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 add_dependencies(obstacle_detector_node 
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
-  obstacle_detector_gencfg
+  # obstacle_detector_gencfg
   ${PROJECT_NAME}
 )
 
