@@ -2,12 +2,15 @@
 
 3D LiDAR Object Detection &amp; Tracking using Euclidean Clustering &amp; Hungarian algorithm
 
+[![CodeFactor](https://www.codefactor.io/repository/github/ss47816/lidar_obstacle_detector/badge)](https://www.codefactor.io/repository/github/ss47816/lidar_obstacle_detector)
 ![Code Grade](https://api.codiga.io/project/30668/status/svg)
 ![Code Quality Score](https://api.codiga.io/project/30668/score/svg)
-[![CodeFactor](https://www.codefactor.io/repository/github/ss47816/lidar_obstacle_detector/badge)](https://www.codefactor.io/repository/github/ss47816/lidar_obstacle_detector)
+![GitHub Repo stars](https://img.shields.io/github/stars/ss47816/lidar_obstacle_detector?color=FFE333)
+![GitHub Repo forks](https://img.shields.io/github/forks/ss47816/lidar_obstacle_detector?color=FFE333)
 
-![GitHub Repo stars](https://img.shields.io/github/stars/ss47816/lidar_obstacle_detector)
-![GitHub Repo forks](https://img.shields.io/github/forks/ss47816/lidar_obstacle_detector)
+![Ubuntu](https://img.shields.io/badge/OS-Ubuntu-informational?style=flat&logo=ubuntu&logoColor=white&color=2bbc8a)
+![ROS](https://img.shields.io/badge/Tools-ROS-informational?style=flat&logo=ROS&logoColor=white&color=2bbc8a)
+![C++](https://img.shields.io/badge/Code-C++-informational?style=flat&logo=c%2B%2B&logoColor=white&color=2bbc8a)
 
 ![demo_1](media/demo_1.gif)
 
