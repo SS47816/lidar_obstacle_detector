@@ -109,7 +109,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES lidar_obstacle_detector
-  CATKIN_DEPENDS roscpp rospy std_msgs
+  CATKIN_DEPENDS roscpp rospy std_msgs pcl_ros tf2_ros dynamic_reconfigure autoware_msgs jsk_recognition_msgs
   DEPENDS system_lib
 )
 
