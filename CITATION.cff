@@ -1,0 +1,14 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: LiDAR Obstacle Detector
+message: >-
+  If you find this software useful, please cite our work as below.
+type: software
+authors:
+  - given-names: Shuo
+    family-names: SUN
+    email: shuo.sun@u.nus.edu
+    affiliation: National University of Singapore
+    orcid: 'https://orcid.org/0000-0002-8432-0452'
