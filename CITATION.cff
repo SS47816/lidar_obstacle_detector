@@ -11,6 +11,7 @@ authors:
     email: shuo.sun@u.nus.edu
     affiliation: National University of Singapore
     orcid: 'https://orcid.org/0000-0002-8432-0452'
-title: LiDAR Obstacle Detector
-date-released: 2021-12-26
+title: Lidar obstacle detector
 url: "https://github.com/SS47816/lidar_obstacle_detector"
+version: 1.0.0
+date-released: 2021-12-26
