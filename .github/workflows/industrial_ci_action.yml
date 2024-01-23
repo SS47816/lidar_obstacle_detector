@@ -19,7 +19,7 @@ jobs:
     strategy:
       # fail-fast: false # uncomment if failing jobs should not cancel the others immediately
       matrix: # matrix is the product of entries
-        ROS_DISTRO: [melodic]
+        ROS_DISTRO: [noetic]
         ROS_REPO: [main] # testing, 
         # exclude: # specific configuration can be excludes
         #   - {ROS_DISTRO: melodic, ROS_REPO: testing}
