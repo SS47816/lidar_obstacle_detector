@@ -21,7 +21,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <dynamic_reconfigure/server.h>
-#include <lidar_obstacle_detector/obstacle_detector_Config.h>
+#include <lidar_obstacle_detector/obstacle_detectorConfig.h>
 
 #include "lidar_obstacle_detector/obstacle_detector.hpp"
 
@@ -53,8 +53,8 @@ class ObstacleDetectorNode
   ros::NodeHandle nh;
   tf2_ros::Buffer tf2_buffer;
   tf2_ros::TransformListener tf2_listener;
-  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
-  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config>::CallbackType f;
+  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detectorConfig> server;
+  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detectorConfig>::CallbackType f;
 
   ros::Subscriber sub_lidar_points;
   ros::Publisher pub_cloud_ground;
@@ -70,7 +70,7 @@ class ObstacleDetectorNode
 };
 
 // Dynamic parameter server callback function
-void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& config, uint32_t level)
+void dynamicParamCallback(lidar_obstacle_detector::obstacle_detectorConfig& config, uint32_t level)
 {
   // Pointcloud Filtering Parameters
   USE_PCA_BOX = config.use_pca_box;
