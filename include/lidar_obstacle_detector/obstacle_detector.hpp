@@ -434,6 +434,8 @@ bool ObstacleDetector<PointT>::hungarianFind(const int i, const std::vector<std:
       }
     }
   }
+
+  return false;
 }
 
 template <typename PointT>
