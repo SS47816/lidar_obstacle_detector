@@ -6,6 +6,8 @@
 ![ROS](https://img.shields.io/badge/Tools-ROS-informational?style=flat&logo=ROS&logoColor=white&color=2bbc8a)
 ![C++](https://img.shields.io/badge/Code-C++-informational?style=flat&logo=c%2B%2B&logoColor=white&color=2bbc8a)
 [![CodeFactor](https://www.codefactor.io/repository/github/ss47816/lidar_obstacle_detector/badge)](https://www.codefactor.io/repository/github/ss47816/lidar_obstacle_detector)
+[![ROS-CI](https://github.com/ros-industrial/industrial_ci/workflows/CI/badge.svg?branch=master)](https://github.com/ss47816/lidar_obstacle_detector/actions/workflows/industrial_ci_action.yml)
+[![cpp-linter](https://github.com/cpp-linter/cpp-linter-action/actions/workflows/cpp-linter.yml/badge.svg)](https://github.com/ss47816/lidar_obstacle_detector/actions/workflows/cpp-linter.yml)
 ![GitHub Repo stars](https://img.shields.io/github/stars/ss47816/lidar_obstacle_detector?color=FFE333)
 ![GitHub Repo forks](https://img.shields.io/github/forks/ss47816/lidar_obstacle_detector?color=FFE333)
 
