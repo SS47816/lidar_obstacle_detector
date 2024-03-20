@@ -1,0 +1,41 @@
+fail_fast: false
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: "v4.4.0"
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      # - id: no-commit-to-branch
+      #   args: [-b main, -b master]
+      - id: requirements-txt-fixer
+      - id: sort-simple-yaml
+      - id: trailing-whitespace
+
+  - repo: https://github.com/pocc/pre-commit-hooks
+    rev: master
+    hooks:
+      - id: clang-format
+        args: [--style=Google, -i]
+      # - id: clang-tidy
+      #   args: [--fix-errors]
+      - id: cppcheck
+      - id: cpplint
+      # - id: oclint
+      # - id: uncrustify
+      # - id: include-what-you-use
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.1.6"
+    hooks:
+      - id: ruff
+        args: [--exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: "v3.0.3"
+    hooks:
+      - id: prettier

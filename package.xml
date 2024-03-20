@@ -74,7 +74,7 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>pcl_ros</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
-  <exec_depend>tf2_geometry_msgs</exec_depend>  
+  <exec_depend>tf2_geometry_msgs</exec_depend>
   <exec_depend>dynamic_reconfigure</exec_depend>
   <exec_depend>autoware_msgs</exec_depend>
   <exec_depend>jsk_recognition_msgs</exec_depend>
