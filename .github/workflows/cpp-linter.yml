@@ -1,0 +1,26 @@
+name: cpp-linter
+
+on: [push, pull_request]
+
+jobs:
+  cpp-linter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cpp-linter/cpp-linter-action@main
+        id: linter
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          style: file # optional, default is llvm
+          tidy-checks: ''
+          files-changed-only: false
+          thread-comments: ${{ github.event_name == 'pull_request' && 'update' }}
+
+      - name: Fail fast?!
+        if: steps.linter.outputs.checks-failed != 0
+        run: |
+          echo "some linter checks failed. ${{ steps.linter.outputs.checks-failed }}"
+        # for actual deployment
+        # run: exit 1
