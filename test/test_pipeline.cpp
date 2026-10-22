@@ -124,3 +124,22 @@ TEST(Preprocess, VoxelDownsampleAveragesEachVoxel) {
   EXPECT_NEAR(out->points[1].x, -0.05f, 1e-6);
   EXPECT_NEAR(out->points[2].intensity, 7.f, 1e-6);
 }
+
+TEST(Pipeline, StructuresAndOccupancyAreReported) {
+  ObstacleDetector<pcl::PointXYZI> detector(sceneConfig("fast"));
+  std::mt19937 rng(3);
+  auto cloud = syntheticScene(10.f, &rng);
+  for (float x = -25.f; x <= 25.f; x += 0.1f)  // a 50 m wall along the road
+    for (float z = 0.1f; z <= 2.f; z += 0.1f) {
+      pcl::PointXYZI p;
+      p.x = x, p.y = -12.f, p.z = z - kSensorHeight, p.intensity = 0.f;
+      cloud->push_back(p);
+    }
+  const auto res = detector.process(cloud, 0.0);
+  EXPECT_EQ(res.boxes.size(), 2u);  // car and pole; the wall is not an object
+  ASSERT_EQ(res.structures.size(), 1u);
+  EXPECT_GT(res.structure_boxes[0].size.x(), 40.f);
+  EXPECT_EQ(res.occupancy.atPoint(10.f, -12.f), OccupancyGrid2D::kOccupied);
+  EXPECT_EQ(res.occupancy.atPoint(5.f, 0.f), OccupancyGrid2D::kFree);
+  EXPECT_FALSE(res.occupied_voxels->empty());
+}

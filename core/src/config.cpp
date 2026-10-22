@@ -23,18 +23,27 @@ PipelineConfig PipelineConfig::preset(const std::string &name) {
     c.ground.max_slope_deg = 90.f;
     c.cluster.method = ClusterMethod::kEuclidean;
     c.box.method = BoxMethod::kAabb;
+    c.tracker.heading_from_motion = false;
+    c.tracker.shape_completion = false;
   } else if (name == "fast") {
     c.ground.method = GroundMethod::kPatchworkpp;
     c.ground.refine = true;
     c.cluster.method = ClusterMethod::kBevGrid;
     c.cluster.range_gain = 0.02f;
+    c.cluster.z_gap = 0.8f;
+    c.cluster.split_oversized = true;
+    c.cluster.separate_structures = true;
     c.box.method = BoxMethod::kLShape;
+    c.occupancy.enabled = true;
   } else if (name == "accurate") {
     c.ground.method = GroundMethod::kPatchworkpp;
     c.ground.refine = true;
     c.cluster.method = ClusterMethod::kAdaptiveEuclidean;
     c.cluster.range_gain = 0.02f;
+    c.cluster.split_oversized = true;
+    c.cluster.separate_structures = true;
     c.box.method = BoxMethod::kLShape;
+    c.occupancy.enabled = true;
   } else {
     throw std::invalid_argument("unknown preset '" + name +
                                 "' (expected legacy, fast or accurate)");
@@ -201,6 +210,17 @@ const std::vector<Entry> &entries() {
            0.2, [](C &c) -> float & { return c.cluster.range_gain; }),
       real("cluster_cell_size", "BEV grid cell size [m]", 0.05, 2,
            [](C &c) -> float & { return c.cluster.cell_size; }),
+      real("cluster_z_gap",
+           "BEV grid: split columns at vertical gaps > max(gap, 0.04 * range) [m], 0 = off", 0, 5,
+           [](C &c) -> float & { return c.cluster.z_gap; }),
+      boolean("cluster_split_oversized", "Re-cluster oversized clusters with a tighter tolerance",
+              [](C &c) -> bool & { return c.cluster.split_oversized; }),
+      boolean("separate_structures", "Report oversized clusters as structures instead of objects",
+              [](C &c) -> bool & { return c.cluster.separate_structures; }),
+      real("object_max_length", "Longer clusters are split or become structures [m]", 1, 100,
+           [](C &c) -> float & { return c.cluster.object_max_length; }),
+      real("object_max_width", "Wider clusters are split or become structures [m]", 0.5, 50,
+           [](C &c) -> float & { return c.cluster.object_max_width; }),
       integer("cluster_min_size", "Min points per cluster", 1, 100000,
               [](C &c) -> int & { return c.cluster.min_size; }),
       integer("cluster_max_size", "Max points per cluster", 1, 10000000,
@@ -233,6 +253,23 @@ const std::vector<Entry> &entries() {
            [](C &c) -> float & { return c.tracker.meas_noise; }),
       real("track_size_smoothing", "EMA weight of new size measurements", 0, 1,
            [](C &c) -> float & { return c.tracker.size_smoothing; }),
+      boolean("track_heading_from_motion", "Moving, stable tracks take their yaw from the velocity",
+              [](C &c) -> bool & { return c.tracker.heading_from_motion; }),
+      real("track_heading_min_speed", "Min speed for heading from motion [m/s]", 0, 50,
+           [](C &c) -> float & { return c.tracker.heading_min_speed; }),
+      boolean("track_shape_completion", "Keep the track's full size for partially visible objects",
+              [](C &c) -> bool & { return c.tracker.shape_completion; }),
+      // --- occupancy ---
+      boolean("occupancy_enabled", "Compute the 2D occupancy grid and 3D occupied voxels",
+              [](C &c) -> bool & { return c.occupancy.enabled; }),
+      real("occupancy_resolution", "2D occupancy grid cell size [m]", 0.05, 2,
+           [](C &c) -> float & { return c.occupancy.resolution; }),
+      real("occupancy_min_height", "Obstacle points count from this height above ground [m]", 0, 5,
+           [](C &c) -> float & { return c.occupancy.min_height; }),
+      real("occupancy_max_height", "... up to this height above ground [m]", 0, 10,
+           [](C &c) -> float & { return c.occupancy.max_height; }),
+      real("occupancy_voxel_size", "3D occupied voxel size [m]", 0.05, 2,
+           [](C &c) -> float & { return c.occupancy.voxel_size; }),
   };
   return table;
 }

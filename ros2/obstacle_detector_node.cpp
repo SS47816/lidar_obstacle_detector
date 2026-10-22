@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <memory>
 #include <mutex>
+#include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -116,6 +117,8 @@ class ObstacleDetectorNode : public rclcpp::Node {
     pub_obstacles_ = create_publisher<sensor_msgs::msg::PointCloud2>("~/cloud_obstacles", 1);
     pub_detections_ = create_publisher<vision_msgs::msg::Detection3DArray>("~/detections", 1);
     pub_markers_ = create_publisher<visualization_msgs::msg::MarkerArray>("~/markers", 1);
+    pub_occupancy_ = create_publisher<nav_msgs::msg::OccupancyGrid>("~/occupancy", 1);
+    pub_voxels_ = create_publisher<sensor_msgs::msg::PointCloud2>("~/occupancy_voxels", 1);
 #ifdef LOD_HAVE_AUTOWARE
     pub_autoware_ =
         create_publisher<autoware_perception_msgs::msg::DetectedObjects>("~/objects", 1);
@@ -263,7 +266,7 @@ class ObstacleDetectorNode : public rclcpp::Node {
       target_T_sensor.setIdentity();
     }
     publishClouds(res, msg->header);
-    publishObjects(res.boxes, out_header, target_T_sensor, tracking_T_sensor);
+    publishObjects(res.boxes, res.structure_boxes, out_header, target_T_sensor, tracking_T_sensor);
 
     RCLCPP_DEBUG(get_logger(),
                  "%zu obstacles in %.1f ms (pre %.1f, ground %.1f, cluster %.1f, box %.1f, "
@@ -290,10 +293,31 @@ class ObstacleDetectorNode : public rclcpp::Node {
       out->header = header;
       pub_obstacles_->publish(std::move(out));
     }
+    // Occupancy outputs, in the lidar frame
+    if (pub_occupancy_->get_subscription_count() > 0 && res.occupancy.width > 0) {
+      const auto &g = res.occupancy;
+      auto out = std::make_unique<nav_msgs::msg::OccupancyGrid>();
+      out->header = header;
+      out->info.map_load_time = header.stamp;
+      out->info.resolution = g.resolution;
+      out->info.width = static_cast<uint32_t>(g.width);
+      out->info.height = static_cast<uint32_t>(g.height);
+      out->info.origin.position.x = g.origin.x();
+      out->info.origin.position.y = g.origin.y();
+      out->info.origin.orientation.w = 1.0;
+      out->data.assign(g.data.begin(), g.data.end());
+      pub_occupancy_->publish(std::move(out));
+    }
+    if (pub_voxels_->get_subscription_count() > 0) {
+      auto out = std::make_unique<sensor_msgs::msg::PointCloud2>();
+      pcl::toROSMsg(*res.occupied_voxels, *out);
+      out->header = header;
+      pub_voxels_->publish(std::move(out));
+    }
   }
 
-  void publishObjects(const std::vector<Box> &boxes, const std_msgs::msg::Header &header,
-                      const Eigen::Isometry3f &target_T_sensor,
+  void publishObjects(const std::vector<Box> &boxes, const std::vector<Box> &structures,
+                      const std_msgs::msg::Header &header, const Eigen::Isometry3f &target_T_sensor,
                       const Eigen::Isometry3f &tracking_T_sensor) {
     const Eigen::Matrix3f r_ts = target_T_sensor.rotation();
     const float target_dyaw = std::atan2(r_ts(1, 0), r_ts(0, 0));
@@ -307,6 +331,22 @@ class ObstacleDetectorNode : public rclcpp::Node {
     clear.header = header;
     clear.action = visualization_msgs::msg::Marker::DELETEALL;
     markers.markers.push_back(clear);
+    // Structures (walls, vegetation, ...): grey, not tracked, not in the object outputs
+    for (size_t k = 0; k < structures.size(); ++k) {
+      const Box &b = structures[k];
+      visualization_msgs::msg::Marker m;
+      m.header = header;
+      m.ns = "structures";
+      m.id = static_cast<int>(k);
+      m.type = visualization_msgs::msg::Marker::CUBE;
+      m.pose = toPose(target_T_sensor * b.center, wrapAngle(b.yaw + target_dyaw));
+      m.scale.x = std::max(b.size.x(), 0.05f);
+      m.scale.y = std::max(b.size.y(), 0.05f);
+      m.scale.z = std::max(b.size.z(), 0.05f);
+      m.color.r = m.color.g = m.color.b = 0.6f;
+      m.color.a = 0.15f;
+      markers.markers.push_back(m);
+    }
 #ifdef LOD_HAVE_AUTOWARE
     autoware_perception_msgs::msg::DetectedObjects objects;
     objects.header = header;
@@ -355,7 +395,7 @@ class ObstacleDetectorNode : public rclcpp::Node {
       text.text = std::to_string(b.id);
       markers.markers.push_back(text);
 
-      if (b.has_velocity && vel.head<2>().norm() > 0.5f) {
+      if (b.has_velocity && vel.head<2>().norm() > 1.5f) {
         visualization_msgs::msg::Marker arrow = box;
         arrow.ns = "velocity";
         arrow.type = visualization_msgs::msg::Marker::ARROW;
@@ -378,7 +418,8 @@ class ObstacleDetectorNode : public rclcpp::Node {
       obj.classification.push_back(cls);
       obj.kinematics.pose_with_covariance.pose = pose;
       obj.kinematics.orientation_availability =
-          autoware_perception_msgs::msg::DetectedObjectKinematics::SIGN_UNKNOWN;
+          b.heading_known ? autoware_perception_msgs::msg::DetectedObjectKinematics::AVAILABLE
+                          : autoware_perception_msgs::msg::DetectedObjectKinematics::SIGN_UNKNOWN;
       if (b.has_velocity) {
         // Autoware expresses the twist in the object frame
         const float c = std::cos(yaw), s = std::sin(yaw);
@@ -413,6 +454,8 @@ class ObstacleDetectorNode : public rclcpp::Node {
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_ground_, pub_obstacles_;
   rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr pub_detections_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_markers_;
+  rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr pub_occupancy_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_voxels_;
 #ifdef LOD_HAVE_AUTOWARE
   rclcpp::Publisher<autoware_perception_msgs::msg::DetectedObjects>::SharedPtr pub_autoware_;
 #endif

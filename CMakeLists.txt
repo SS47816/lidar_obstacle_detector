@@ -48,6 +48,7 @@ add_library(lidar_obstacle_detector_core
   core/src/config.cpp
   core/src/hungarian.cpp
   core/src/obstacle_detector.cpp
+  core/src/occupancy.cpp
   core/src/patchworkpp_segmenter.cpp
   core/src/tracker.cpp
   core/src/types.cpp
@@ -74,6 +75,7 @@ set(LOD_TEST_SOURCES
   test/test_config.cpp
   test/test_geometry.cpp
   test/test_hungarian.cpp
+  test/test_occupancy.cpp
   test/test_pipeline.cpp
   test/test_tracker.cpp
 )
@@ -88,6 +90,7 @@ if(LOD_ROS_VERSION STREQUAL "2")
   find_package(sensor_msgs REQUIRED)
   find_package(vision_msgs REQUIRED)
   find_package(visualization_msgs REQUIRED)
+  find_package(nav_msgs REQUIRED)
   find_package(tf2_ros REQUIRED)
   find_package(tf2_eigen REQUIRED)
   find_package(pcl_conversions REQUIRED)
@@ -101,6 +104,7 @@ if(LOD_ROS_VERSION STREQUAL "2")
     ${sensor_msgs_TARGETS}
     ${vision_msgs_TARGETS}
     ${visualization_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
     tf2_ros::tf2_ros
     tf2_eigen::tf2_eigen
     ${pcl_conversions_LIBRARIES}
@@ -134,14 +138,14 @@ if(LOD_ROS_VERSION STREQUAL "2")
 # ------------------------------------------------------------------------------
 elseif(LOD_ROS_VERSION STREQUAL "1")
   find_package(catkin REQUIRED COMPONENTS
-    roscpp sensor_msgs visualization_msgs pcl_conversions tf2_ros tf2_eigen
+    roscpp sensor_msgs visualization_msgs nav_msgs pcl_conversions tf2_ros tf2_eigen
     dynamic_reconfigure jsk_recognition_msgs)
   find_package(autoware_msgs QUIET)
   generate_dynamic_reconfigure_options(cfg/obstacle_detector.cfg)
   catkin_package(
     INCLUDE_DIRS core/include
     LIBRARIES lidar_obstacle_detector_core
-    CATKIN_DEPENDS roscpp sensor_msgs visualization_msgs jsk_recognition_msgs
+    CATKIN_DEPENDS roscpp sensor_msgs visualization_msgs nav_msgs jsk_recognition_msgs
   )
   add_executable(obstacle_detector_node ros1/obstacle_detector_node.cpp)
   target_include_directories(obstacle_detector_node PRIVATE ${catkin_INCLUDE_DIRS})

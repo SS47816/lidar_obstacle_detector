@@ -28,6 +28,9 @@ struct Box {
   bool has_velocity = false;  // velocity estimate is available
   Eigen::Vector2f velocity = Eigen::Vector2f::Zero();
   uint32_t age = 0;  // number of frames the track has been updated
+  // Yaw is the direction of travel (front/back resolved from the motion); when
+  // false, yaw is only known modulo 180 deg
+  bool heading_known = false;
 
   Box() = default;
   Box(uint32_t id, const Eigen::Vector3f &center, const Eigen::Vector3f &size, float yaw = 0.f)
@@ -45,6 +48,7 @@ struct StageTimings {
   double cluster = 0.0;
   double box = 0.0;
   double track = 0.0;
+  double occupancy = 0.0;
   double total = 0.0;
 };
 

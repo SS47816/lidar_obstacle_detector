@@ -11,6 +11,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <jsk_recognition_msgs/BoundingBoxArray.h>
 #include <lidar_obstacle_detector/obstacle_detectorConfig.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -78,6 +79,11 @@ class ObstacleDetectorNode {
     private_nh_.param<std::string>("autoware_objects_topic", autoware_objects_topic,
                                    "obstacle_detector/objects");
     private_nh_.param<std::string>("markers_topic", markers_topic, "obstacle_detector/markers");
+    std::string occupancy_topic, voxels_topic;
+    private_nh_.param<std::string>("occupancy_topic", occupancy_topic,
+                                   "obstacle_detector/occupancy");
+    private_nh_.param<std::string>("occupancy_voxels_topic", voxels_topic,
+                                   "obstacle_detector/occupancy_voxels");
     private_nh_.param<std::string>("bbox_target_frame", target_frame_, "");
     private_nh_.param<std::string>("tracking_frame", tracking_frame_, "");
     private_nh_.param<double>("tf_timeout", tf_timeout_, 0.1);
@@ -110,6 +116,8 @@ class ObstacleDetectorNode {
 
     pub_ground_ = nh_.advertise<sensor_msgs::PointCloud2>(cloud_ground_topic, 1);
     pub_obstacles_ = nh_.advertise<sensor_msgs::PointCloud2>(cloud_clusters_topic, 1);
+    pub_occupancy_ = nh_.advertise<nav_msgs::OccupancyGrid>(occupancy_topic, 1);
+    pub_voxels_ = nh_.advertise<sensor_msgs::PointCloud2>(voxels_topic, 1);
     pub_jsk_ = nh_.advertise<jsk_recognition_msgs::BoundingBoxArray>(jsk_bboxes_topic, 1);
     pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(markers_topic, 1);
 #ifdef LOD_HAVE_AUTOWARE
@@ -195,6 +203,26 @@ class ObstacleDetectorNode {
     ground.header = obstacles.header = msg->header;
     pub_ground_.publish(ground);
     pub_obstacles_.publish(obstacles);
+    if (pub_occupancy_.getNumSubscribers() > 0 && res.occupancy.width > 0) {
+      const auto &g = res.occupancy;
+      nav_msgs::OccupancyGrid grid;
+      grid.header = msg->header;
+      grid.info.map_load_time = msg->header.stamp;
+      grid.info.resolution = g.resolution;
+      grid.info.width = static_cast<uint32_t>(g.width);
+      grid.info.height = static_cast<uint32_t>(g.height);
+      grid.info.origin.position.x = g.origin.x();
+      grid.info.origin.position.y = g.origin.y();
+      grid.info.origin.orientation.w = 1.0;
+      grid.data.assign(g.data.begin(), g.data.end());
+      pub_occupancy_.publish(grid);
+    }
+    if (pub_voxels_.getNumSubscribers() > 0) {
+      sensor_msgs::PointCloud2 voxels;
+      pcl::toROSMsg(*res.occupied_voxels, voxels);
+      voxels.header = msg->header;
+      pub_voxels_.publish(voxels);
+    }
 
     // Boxes in bbox_target_frame (falls back to the lidar frame, as in v1)
     std_msgs::Header header = msg->header;
@@ -204,12 +232,12 @@ class ObstacleDetectorNode {
     } else {
       target_T_sensor.setIdentity();
     }
-    publishObjects(res.boxes, header, target_T_sensor, tracking_T_sensor);
+    publishObjects(res.boxes, res.structure_boxes, header, target_T_sensor, tracking_T_sensor);
     ROS_INFO_THROTTLE(5.0, "%zu obstacles, %.1f ms/frame", res.boxes.size(), res.timings.total);
   }
 
-  void publishObjects(const std::vector<Box> &boxes, const std_msgs::Header &header,
-                      const Eigen::Isometry3f &target_T_sensor,
+  void publishObjects(const std::vector<Box> &boxes, const std::vector<Box> &structures,
+                      const std_msgs::Header &header, const Eigen::Isometry3f &target_T_sensor,
                       const Eigen::Isometry3f &tracking_T_sensor) {
     const Eigen::Matrix3f r_ts = target_T_sensor.rotation();
     const float target_dyaw = std::atan2(r_ts(1, 0), r_ts(0, 0));
@@ -222,6 +250,22 @@ class ObstacleDetectorNode {
     clear.header = header;
     clear.action = visualization_msgs::Marker::DELETEALL;
     markers.markers.push_back(clear);
+    // Structures (walls, vegetation, ...): grey, not tracked, not in the object outputs
+    for (size_t k = 0; k < structures.size(); ++k) {
+      const Box &b = structures[k];
+      visualization_msgs::Marker m;
+      m.header = header;
+      m.ns = "structures";
+      m.id = static_cast<int>(k);
+      m.type = visualization_msgs::Marker::CUBE;
+      m.pose = toPose(target_T_sensor * b.center, wrapAngle(b.yaw + target_dyaw));
+      m.scale.x = std::max(b.size.x(), 0.05f);
+      m.scale.y = std::max(b.size.y(), 0.05f);
+      m.scale.z = std::max(b.size.z(), 0.05f);
+      m.color.r = m.color.g = m.color.b = 0.6f;
+      m.color.a = 0.15f;
+      markers.markers.push_back(m);
+    }
 #ifdef LOD_HAVE_AUTOWARE
     autoware_msgs::DetectedObjectArray objects;
     objects.header = header;
@@ -254,7 +298,7 @@ class ObstacleDetectorNode {
       text.color.r = text.color.g = text.color.b = text.color.a = 1.f;
       text.text = std::to_string(b.id);
       markers.markers.push_back(text);
-      if (b.has_velocity && vel.head<2>().norm() > 0.5f) {
+      if (b.has_velocity && vel.head<2>().norm() > 1.5f) {
         visualization_msgs::Marker arrow = text;
         arrow.ns = "velocity";
         arrow.type = visualization_msgs::Marker::ARROW;
@@ -301,7 +345,7 @@ class ObstacleDetectorNode {
   tf2_ros::TransformListener tf_listener_;
   dynamic_reconfigure::Server<Config> reconfigure_;
   ros::Subscriber sub_points_;
-  ros::Publisher pub_ground_, pub_obstacles_, pub_jsk_, pub_markers_;
+  ros::Publisher pub_ground_, pub_obstacles_, pub_jsk_, pub_markers_, pub_occupancy_, pub_voxels_;
 #ifdef LOD_HAVE_AUTOWARE
   ros::Publisher pub_autoware_;
 #endif

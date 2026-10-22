@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <pcl/common/io.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -16,6 +17,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <numeric>
 #include <vector>
 
@@ -150,16 +153,59 @@ std::vector<pcl::Indices> bevGridClustering(const typename pcl::PointCloud<Point
     }
     point_cell[i] = cell_of[g];
   }
+  const auto cellRange = [&](int g) {
+    const float cx = min_x + (g / ny + 0.5f) * cell, cy = min_y + (g % ny + 0.5f) * cell;
+    return std::hypot(cx, cy);
+  };
 
-  detail::DisjointSet sets(occupied.size());
+  // Split every cell's column into height segments at vertical gaps, so that
+  // e.g. a tree canopy does not merge with the car below it. The gap grows with
+  // range because the vertical spacing of lidar beams does (~0.7 m at 30 m).
+  std::vector<int> cell_start(occupied.size() + 1, 0), order(cloud->size());
+  for (size_t i = 0; i < cloud->size(); ++i) cell_start[point_cell[i] + 1]++;
+  for (size_t c = 0; c < occupied.size(); ++c) cell_start[c + 1] += cell_start[c];
+  {
+    std::vector<int> fill(cell_start.begin(), cell_start.end() - 1);
+    for (size_t i = 0; i < cloud->size(); ++i) order[fill[point_cell[i]]++] = static_cast<int>(i);
+  }
+  struct Segment {
+    float z_min, z_max;
+  };
+  std::vector<Segment> segments;
+  std::vector<int> seg_start(occupied.size() + 1, 0), point_seg(cloud->size());
+  std::vector<float> seg_gap(occupied.size(), 0.f);
+  for (size_t c = 0; c < occupied.size(); ++c) {
+    seg_start[c] = static_cast<int>(segments.size());
+    auto first = order.begin() + cell_start[c], last = order.begin() + cell_start[c + 1];
+    if (cfg.z_gap <= 0.f) {
+      Segment seg{std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest()};
+      for (auto it = first; it != last; ++it) {
+        seg.z_min = std::min(seg.z_min, cloud->points[*it].z);
+        seg.z_max = std::max(seg.z_max, cloud->points[*it].z);
+        point_seg[*it] = static_cast<int>(segments.size());
+      }
+      segments.push_back(seg);
+      continue;
+    }
+    std::sort(first, last, [&](int a, int b) { return cloud->points[a].z < cloud->points[b].z; });
+    const float gap = std::max(cfg.z_gap, 0.04f * cellRange(occupied[c]));
+    seg_gap[c] = gap;
+    for (auto it = first; it != last; ++it) {
+      const float z = cloud->points[*it].z;
+      if (it == first || z - segments.back().z_max > gap) segments.push_back({z, z});
+      segments.back().z_max = z;
+      point_seg[*it] = static_cast<int>(segments.size()) - 1;
+    }
+  }
+  seg_start[occupied.size()] = static_cast<int>(segments.size());
+
+  detail::DisjointSet sets(segments.size());
   for (size_t c = 0; c < occupied.size(); ++c) {
     const int gx = occupied[c] / ny, gy = occupied[c] % ny;
     float tol = cfg.tolerance;
-    if (cfg.range_gain > 0.f) {
-      const float cx = min_x + (gx + 0.5f) * cell, cy = min_y + (gy + 0.5f) * cell;
-      tol = std::max(tol, cfg.range_gain * std::hypot(cx, cy));
-    }
+    if (cfg.range_gain > 0.f) tol = std::max(tol, cfg.range_gain * cellRange(occupied[c]));
     const int k = std::max(1, static_cast<int>(tol / cell));
+    const float gap = seg_gap[c];
     // Visit only the "forward" half of the neighbourhood; links are symmetric
     for (int dx = 0; dx <= k; ++dx) {
       const int x = gx + dx;
@@ -168,14 +214,21 @@ std::vector<pcl::Indices> bevGridClustering(const typename pcl::PointCloud<Point
         const int y = gy + dy;
         if (y < 0 || y >= ny) continue;
         const int other = cell_of[x * ny + y];
-        if (other >= 0) sets.unite(static_cast<int>(c), other);
+        if (other < 0) continue;
+        for (int a = seg_start[c]; a < seg_start[c + 1]; ++a) {
+          for (int b = seg_start[other]; b < seg_start[other + 1]; ++b) {
+            if (cfg.z_gap <= 0.f || (segments[a].z_min <= segments[b].z_max + gap &&
+                                     segments[b].z_min <= segments[a].z_max + gap))
+              sets.unite(a, b);
+          }
+        }
       }
     }
   }
 
-  std::vector<int> label(occupied.size(), -1);
+  std::vector<int> label(segments.size(), -1);
   for (size_t i = 0; i < cloud->size(); ++i) {
-    const int root = sets.find(point_cell[i]);
+    const int root = sets.find(point_seg[i]);
     if (label[root] < 0) {
       label[root] = static_cast<int>(clusters.size());
       clusters.emplace_back();
@@ -198,6 +251,88 @@ std::vector<pcl::Indices> clusterCloud(const typename pcl::PointCloud<PointT>::C
     default:
       return euclideanClustering<PointT>(cloud, cfg);
   }
+}
+
+namespace detail {
+
+template <typename PointT>
+bool isOversized(const pcl::PointCloud<PointT> &cloud, const pcl::Indices &indices,
+                 const ClusterConfig &cfg) {
+  if (static_cast<int>(indices.size()) > cfg.max_size) return true;
+  // Cheap yaw-only PCA extent; L-shape fitting on huge clusters is not needed here
+  float sxx = 0.f, sxy = 0.f, syy = 0.f, mx = 0.f, my = 0.f;
+  for (const auto i : indices) {
+    mx += cloud.points[i].x;
+    my += cloud.points[i].y;
+  }
+  mx /= indices.size();
+  my /= indices.size();
+  for (const auto i : indices) {
+    const float dx = cloud.points[i].x - mx, dy = cloud.points[i].y - my;
+    sxx += dx * dx;
+    sxy += dx * dy;
+    syy += dy * dy;
+  }
+  const float theta = 0.5f * std::atan2(2.f * sxy, sxx - syy);
+  const float c = std::cos(theta), s = std::sin(theta);
+  float lo1 = std::numeric_limits<float>::max(), hi1 = std::numeric_limits<float>::lowest();
+  float lo2 = lo1, hi2 = hi1;
+  for (const auto i : indices) {
+    const float dx = cloud.points[i].x - mx, dy = cloud.points[i].y - my;
+    const float u = c * dx + s * dy, v = -s * dx + c * dy;
+    lo1 = std::min(lo1, u), hi1 = std::max(hi1, u);
+    lo2 = std::min(lo2, v), hi2 = std::max(hi2, v);
+  }
+  const float length = std::max(hi1 - lo1, hi2 - lo2), width = std::min(hi1 - lo1, hi2 - lo2);
+  return length > cfg.object_max_length || width > cfg.object_max_width;
+}
+
+template <typename PointT>
+void splitRecursively(const typename pcl::PointCloud<PointT>::ConstPtr &cloud,
+                      const pcl::Indices &indices, ClusterConfig cfg, int depth,
+                      std::vector<pcl::Indices> *objects, std::vector<pcl::Indices> *structures) {
+  if (!isOversized(*cloud, indices, cfg)) {
+    objects->push_back(indices);
+    return;
+  }
+  cfg.tolerance *= 0.5f;
+  cfg.cell_size = std::min(cfg.cell_size, cfg.tolerance);
+  cfg.range_gain *= 0.5f;
+  if (!cfg.split_oversized || depth >= 3 || cfg.tolerance < 0.2f) {
+    structures->push_back(indices);
+    return;
+  }
+  typename pcl::PointCloud<PointT>::Ptr sub(new pcl::PointCloud<PointT>);
+  pcl::copyPointCloud(*cloud, indices, *sub);
+  ClusterConfig sub_cfg = cfg;
+  sub_cfg.max_size = std::numeric_limits<int>::max();
+  const std::vector<pcl::Indices> pieces = clusterCloud<PointT>(sub, sub_cfg);
+  if (pieces.size() < 2) {
+    structures->push_back(indices);
+    return;
+  }
+  for (const auto &piece : pieces) {
+    pcl::Indices mapped;
+    mapped.reserve(piece.size());
+    for (const auto i : piece) mapped.push_back(indices[i]);
+    splitRecursively<PointT>(cloud, mapped, cfg, depth + 1, objects, structures);
+  }
+}
+
+}  // namespace detail
+
+// Clusters larger than an object (by points or by extent) are re-clustered
+// with half the tolerance, recursively; what remains oversized is moved to
+// `structures` (walls, vegetation, buildings).
+template <typename PointT>
+void splitOversizedClusters(const typename pcl::PointCloud<PointT>::ConstPtr &cloud,
+                            const ClusterConfig &cfg, std::vector<pcl::Indices> *clusters,
+                            std::vector<pcl::Indices> *structures) {
+  std::vector<pcl::Indices> objects;
+  objects.reserve(clusters->size());
+  for (const auto &c : *clusters)
+    detail::splitRecursively<PointT>(cloud, c, cfg, 0, &objects, structures);
+  clusters->swap(objects);
 }
 
 }  // namespace lidar_obstacle_detector

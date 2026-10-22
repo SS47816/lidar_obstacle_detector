@@ -111,3 +111,56 @@ TEST(Tracker, ResetsWhenTimeJumpsBack) {
   EXPECT_NE(a[0].id, b[0].id);
   EXPECT_EQ(tracker.numTracks(), 1u);
 }
+
+TEST(Tracker, MovingTargetTakesHeadingFromMotion) {
+  MultiObjectTracker tracker;
+  const float course = 0.6f;  // [rad] direction of travel
+  for (int k = 0; k < 15; ++k) {
+    const float s = 8.f * 0.1f * k;
+    // The box fitter only knows the yaw modulo 90 deg: report it rotated by 90
+    std::vector<Box> boxes{det(s * std::cos(course), s * std::sin(course),
+                               course + static_cast<float>(M_PI_2), 2.f, 4.5f)};
+    tracker.update(0.1 * k, &boxes);
+    if (k >= 8) {
+      EXPECT_TRUE(boxes[0].heading_known);
+      EXPECT_NEAR(boxes[0].yaw, course, 0.05f);    // front/back resolved too
+      EXPECT_NEAR(boxes[0].size.x(), 4.5f, 1e-4);  // length along the motion
+    }
+  }
+}
+
+TEST(Tracker, ParkedTargetKeepsBoxYaw) {
+  MultiObjectTracker tracker;
+  for (int k = 0; k < 10; ++k) {
+    std::vector<Box> boxes{det(10.f, 3.f, 0.3f, 4.5f, 1.8f)};
+    tracker.update(0.1 * k, &boxes);
+    EXPECT_FALSE(boxes[0].heading_known);
+    EXPECT_NEAR(boxes[0].yaw, 0.3f, 1e-4);
+  }
+}
+
+TEST(Tracker, ShapeCompletionKeepsFullSizeOfPartialView) {
+  MultiObjectTracker tracker;
+  // A parked car at x = 10..14.5, seen whole for a while
+  for (int k = 0; k < 8; ++k) {
+    std::vector<Box> boxes{det(12.25f, 0.f, 0.f, 4.5f, 1.8f)};
+    tracker.update(0.1 * k, &boxes);
+  }
+  // Now only its near end (x = 10..11.5) is visible, e.g. occluded by another car
+  std::vector<Box> partial{det(10.75f, 0.f, 0.f, 1.5f, 1.8f)};
+  tracker.update(0.8, &partial);
+  EXPECT_NEAR(partial[0].size.x(), 4.5f, 0.3f);
+  // The face towards the sensor (x = 10) stays put; the box extends away from it
+  EXPECT_NEAR(partial[0].center.x() - 0.5f * partial[0].size.x(), 10.f, 0.1f);
+
+  TrackerConfig off;
+  off.shape_completion = false;
+  MultiObjectTracker plain(off);
+  for (int k = 0; k < 8; ++k) {
+    std::vector<Box> boxes{det(12.25f, 0.f, 0.f, 4.5f, 1.8f)};
+    plain.update(0.1 * k, &boxes);
+  }
+  std::vector<Box> raw{det(10.75f, 0.f, 0.f, 1.5f, 1.8f)};
+  plain.update(0.8, &raw);
+  EXPECT_NEAR(raw[0].size.x(), 1.5f, 1e-4);
+}

@@ -51,6 +51,16 @@ struct ClusterConfig {
   float tolerance = 0.6f;   // [m] neighbour distance (min. value when adaptive)
   float range_gain = 0.0f;  // adaptive: tolerance = max(tolerance, gain * range)
   float cell_size = 0.25f;  // BEV grid cell size [m]
+  // BEV grid: split cell columns at vertical gaps larger than max(z_gap, 0.04 * range) [m];
+  // 0 disables the split
+  float z_gap = 0.f;
+  // Clusters whose box exceeds these limits are re-clustered with a tighter
+  // tolerance; what is still too large is reported as a structure (wall,
+  // vegetation, ...) instead of an object when separate_structures is set
+  bool split_oversized = false;
+  bool separate_structures = false;
+  float object_max_length = 16.f;  // [m]
+  float object_max_width = 5.f;    // [m]
   int min_size = 10;
   int max_size = 5000;
 };
@@ -62,7 +72,7 @@ struct BoxConfig {
 
 struct TrackerConfig {
   bool enabled = true;
-  TrackCost cost = TrackCost::kCenterDistance;
+  TrackCost cost = TrackCost::kGIoU;
   float max_distance = 2.f;     // [m] association gate on predicted centre distance
   float min_giou = -0.5f;       // GIoU gate (cost = kGIoU)
   int min_hits = 2;             // updates before a track is confirmed
@@ -70,6 +80,20 @@ struct TrackerConfig {
   float accel_noise = 3.f;      // [m/s^2] process noise of the constant-velocity model
   float meas_noise = 0.3f;      // [m] measurement noise of the box centre
   float size_smoothing = 0.3f;  // EMA weight of a new size measurement
+  // Moving, stably tracked objects take their yaw from the velocity direction
+  bool heading_from_motion = true;
+  float heading_min_speed = 2.f;  // [m/s]
+  // Partially visible objects keep the size seen earlier in the track,
+  // anchored at the face that is visible to the sensor
+  bool shape_completion = true;
+};
+
+struct OccupancyConfig {
+  bool enabled = false;
+  float resolution = 0.2f;  // 2D grid cell size [m]
+  float min_height = 0.2f;  // obstacle points counted between these heights
+  float max_height = 2.5f;  // above the local ground [m]
+  float voxel_size = 0.2f;  // 3D occupied voxels [m]
 };
 
 struct PipelineConfig {
@@ -78,6 +102,7 @@ struct PipelineConfig {
   ClusterConfig cluster;
   BoxConfig box;
   TrackerConfig tracker;
+  OccupancyConfig occupancy;
 
   // Named presets: "legacy" (v1 behaviour minus its bugs), "fast", "accurate"
   static PipelineConfig preset(const std::string &name);

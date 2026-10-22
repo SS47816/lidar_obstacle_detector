@@ -83,3 +83,73 @@ TEST(Clustering, AdaptiveToleranceKeepsSparseFarObjectsTogether) {
   cfg.method = ClusterMethod::kBevGrid;
   EXPECT_EQ(clusterCloud<pcl::PointXYZ>(cloud, cfg).size(), 1u);
 }
+
+namespace {
+// Points on the outer surface of an upright box
+void addBoxSurface(Cloud *cloud, float x0, float x1, float y0, float y1, float z0, float z1,
+                   float step = 0.1f) {
+  for (float x = x0; x <= x1; x += step)
+    for (float z = z0; z <= z1; z += step) {
+      cloud->push_back({x, y0, z});
+      cloud->push_back({x, y1, z});
+    }
+  for (float y = y0; y <= y1; y += step)
+    for (float z = z0; z <= z1; z += step) {
+      cloud->push_back({x0, y, z});
+      cloud->push_back({x1, y, z});
+    }
+  for (float x = x0; x <= x1; x += step)
+    for (float y = y0; y <= y1; y += step) cloud->push_back({x, y, z1});
+}
+}  // namespace
+
+TEST(Clustering, HeightGapSeparatesCanopyFromCarBelow) {
+  Cloud::Ptr cloud(new Cloud);
+  addBoxSurface(cloud.get(), 8.f, 12.5f, -0.9f, 0.9f, -1.6f, -0.2f);  // car
+  for (float x = 6.f; x <= 15.f; x += 0.2f)                           // canopy above it
+    for (float y = -3.f; y <= 3.f; y += 0.2f) cloud->push_back({x, y, 0.9f});
+  ClusterConfig cfg;
+  cfg.method = ClusterMethod::kBevGrid;
+  cfg.max_size = 100000;
+  EXPECT_EQ(clusterCloud<pcl::PointXYZ>(cloud, cfg).size(), 1u);  // merged in BEV
+  cfg.z_gap = 0.8f;
+  EXPECT_EQ(clusterCloud<pcl::PointXYZ>(cloud, cfg).size(), 2u);
+}
+
+TEST(Clustering, HeightGapKeepsSparseDistantCarTogether) {
+  // Two beams 0.9 m apart vertically on a car 30 m away must not split it
+  Cloud::Ptr cloud(new Cloud);
+  for (float y = -1.f; y <= 1.f; y += 0.1f) {
+    cloud->push_back({30.f, y, -1.3f});
+    cloud->push_back({30.f, y, -0.4f});
+  }
+  ClusterConfig cfg;
+  cfg.method = ClusterMethod::kBevGrid;
+  cfg.z_gap = 0.8f;
+  cfg.min_size = 5;
+  EXPECT_EQ(clusterCloud<pcl::PointXYZ>(cloud, cfg).size(), 1u);
+}
+
+TEST(Clustering, OversizedClustersAreSplitOrBecomeStructures) {
+  Cloud::Ptr cloud(new Cloud);
+  // four cars in a row, 0.5 m apart: one 19.5 m cluster at tolerance 0.6
+  for (int k = 0; k < 4; ++k)
+    addBoxSurface(cloud.get(), 5.f * k, 5.f * k + 4.5f, 5.f, 6.8f, -1.6f, -0.2f);
+  addBoxSurface(cloud.get(), -15.f, -3.f, -8.f, -5.5f, -1.6f, 1.f);  // a 12 m bus
+  for (float x = -20.f; x <= 20.f; x += 0.15f)                       // a 40 m wall
+    for (float z = -1.6f; z <= 1.f; z += 0.15f) cloud->push_back({x, -20.f, z});
+
+  ClusterConfig cfg;
+  cfg.method = ClusterMethod::kBevGrid;
+  cfg.max_size = 1000000;
+  auto clusters = clusterCloud<pcl::PointXYZ>(cloud, cfg);
+  ASSERT_EQ(clusters.size(), 3u);
+
+  cfg.split_oversized = true;
+  cfg.separate_structures = true;
+  std::vector<pcl::Indices> structures;
+  splitOversizedClusters<pcl::PointXYZ>(cloud, cfg, &clusters, &structures);
+  EXPECT_EQ(clusters.size(), 5u);    // four cars + the bus
+  ASSERT_EQ(structures.size(), 1u);  // the wall
+  for (const auto i : structures[0]) EXPECT_FLOAT_EQ(cloud->points[i].y, -20.f);
+}

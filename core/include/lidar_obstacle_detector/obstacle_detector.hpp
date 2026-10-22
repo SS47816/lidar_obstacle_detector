@@ -16,6 +16,7 @@
 
 #include <Eigen/Geometry>
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -23,6 +24,7 @@
 #include "lidar_obstacle_detector/clustering.hpp"
 #include "lidar_obstacle_detector/config.hpp"
 #include "lidar_obstacle_detector/ground_segmentation.hpp"
+#include "lidar_obstacle_detector/occupancy.hpp"
 #include "lidar_obstacle_detector/preprocess.hpp"
 #include "lidar_obstacle_detector/tracker.hpp"
 #include "lidar_obstacle_detector/types.hpp"
@@ -41,6 +43,13 @@ class ObstacleDetector {
     CloudPtr obstacles;                  // non-ground points (preprocessed)
     std::vector<pcl::Indices> clusters;  // indices into `obstacles`, one per box
     std::vector<Box> boxes;              // in the sensor frame
+    // Oversized clusters (walls, vegetation, ...) when `separate_structures` is
+    // set: indices into `obstacles` and a yaw-only PCA box each, not tracked
+    std::vector<pcl::Indices> structures;
+    std::vector<Box> structure_boxes;
+    // When `occupancy.enabled`: 2D grid and occupied voxel centres (sensor frame)
+    OccupancyGrid2D occupancy;
+    CloudPtr occupied_voxels;
     StageTimings timings;
   };
 
@@ -90,7 +99,19 @@ class ObstacleDetector {
     pcl::copyPointCloud(*filtered, obstacle_idx, *res.obstacles);
     const auto t2 = Clock::now();
 
-    res.clusters = clusterCloud<PointT>(res.obstacles, config_.cluster);
+    const auto &cc = config_.cluster;
+    if (cc.split_oversized || cc.separate_structures) {
+      ClusterConfig run_cfg = cc;
+      run_cfg.max_size = std::numeric_limits<int>::max();  // handled by the split
+      res.clusters = clusterCloud<PointT>(res.obstacles, run_cfg);
+      splitOversizedClusters<PointT>(res.obstacles, cc, &res.clusters, &res.structures);
+      if (!cc.separate_structures) {
+        res.clusters.insert(res.clusters.end(), res.structures.begin(), res.structures.end());
+        res.structures.clear();
+      }
+    } else {
+      res.clusters = clusterCloud<PointT>(res.obstacles, cc);
+    }
     const auto t3 = Clock::now();
 
     res.boxes.resize(res.clusters.size());
@@ -101,17 +122,27 @@ class ObstacleDetector {
       res.boxes[i] = fitBox(*res.obstacles, res.clusters[i], config_.box);
       res.boxes[i].id = static_cast<uint32_t>(i);
     }
+    res.structure_boxes.reserve(res.structures.size());
+    for (const auto &st : res.structures)
+      res.structure_boxes.push_back(fitPcaBox(*res.obstacles, st));
     const auto t4 = Clock::now();
 
     if (config_.tracker.enabled) track(stamp, tracking_T_sensor, &res.boxes);
     const auto t5 = Clock::now();
+
+    res.occupied_voxels.reset(new Cloud);
+    if (config_.occupancy.enabled)
+      computeOccupancy(*res.ground, *res.obstacles, config_.preprocess, config_.occupancy,
+                       &occupancy_mapper_, &res.occupancy, res.occupied_voxels.get());
+    const auto t6 = Clock::now();
 
     res.timings.preprocess = ms(t0, t1);
     res.timings.ground = ms(t1, t2);
     res.timings.cluster = ms(t2, t3);
     res.timings.box = ms(t3, t4);
     res.timings.track = ms(t4, t5);
-    res.timings.total = ms(t0, t5);
+    res.timings.occupancy = ms(t5, t6);
+    res.timings.total = ms(t0, t6);
     return res;
   }
 
@@ -125,7 +156,7 @@ class ObstacleDetector {
       b.center = tracking_T_sensor * b.center;
       b.yaw = wrapAngle(b.yaw + dyaw);
     }
-    tracker_.update(stamp, boxes);
+    tracker_.update(stamp, boxes, tracking_T_sensor.translation().head<2>());
     const Eigen::Isometry3f sensor_T_tracking = tracking_T_sensor.inverse();
     for (auto &b : *boxes) {
       b.center = sensor_T_tracking * b.center;
@@ -136,6 +167,7 @@ class ObstacleDetector {
   PipelineConfig config_;
   std::unique_ptr<GroundSegmenter<PointT>> ground_segmenter_;
   MultiObjectTracker tracker_;
+  OccupancyMapper occupancy_mapper_;
 };
 
 extern template class ObstacleDetector<pcl::PointXYZ>;

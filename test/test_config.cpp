@@ -9,6 +9,7 @@ TEST(Config, Presets) {
   EXPECT_EQ(PipelineConfig::preset("fast").ground.method, GroundMethod::kPatchworkpp);
   EXPECT_EQ(PipelineConfig::preset("accurate").ground.method, GroundMethod::kPatchworkpp);
   EXPECT_EQ(PipelineConfig::preset("legacy").box.method, BoxMethod::kAabb);
+  EXPECT_EQ(PipelineConfig::preset("fast").tracker.cost, TrackCost::kGIoU);
   EXPECT_THROW(PipelineConfig::preset("nope"), std::invalid_argument);
 }
 

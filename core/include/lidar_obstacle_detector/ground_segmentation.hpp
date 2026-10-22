@@ -114,8 +114,84 @@ class PatchworkppGroundSegmenter : public GroundSegmenter<PointT> {
   PatchworkppSegmenterImpl impl_;
 };
 
-// Local elevation-map refinement. Builds a coarse BEV height map (mean z of
-// the ground points per cell) and moves non-ground points that lie within
+// Coarse BEV map of the local ground height: mean z of the ground points per
+// cell; queries fall back to the nearest ring of cells that has ground.
+class GroundHeightMap {
+ public:
+  explicit GroundHeightMap(float cell = 1.f, int search_cells = 3)
+      : cell_(cell), search_(search_cells) {}
+
+  // The map covers the x-y bounds of `cloud`; `ground` selects the ground points
+  template <typename PointT>
+  bool build(const pcl::PointCloud<PointT> &cloud, const pcl::Indices &ground) {
+    nx_ = ny_ = 0;
+    if (cloud.empty() || ground.empty()) return false;
+    min_x_ = min_y_ = std::numeric_limits<float>::max();
+    float max_x = std::numeric_limits<float>::lowest(), max_y = max_x;
+    for (const auto &p : cloud.points) {
+      min_x_ = std::min(min_x_, p.x);
+      min_y_ = std::min(min_y_, p.y);
+      max_x = std::max(max_x, p.x);
+      max_y = std::max(max_y, p.y);
+    }
+    nx_ = static_cast<int>((max_x - min_x_) / cell_) + 1;
+    ny_ = static_cast<int>((max_y - min_y_) / cell_) + 1;
+    if (static_cast<int64_t>(nx_) * ny_ > (int64_t{1} << 24)) {
+      nx_ = ny_ = 0;
+      return false;
+    }
+    sum_.assign(static_cast<size_t>(nx_) * ny_, 0.f);
+    count_.assign(sum_.size(), 0);
+    for (const auto i : ground) {
+      const int c = cellIndex(cloud.points[i].x, cloud.points[i].y);
+      if (c < 0) continue;
+      sum_[c] += cloud.points[i].z;
+      count_[c]++;
+    }
+    return true;
+  }
+
+  // Ground height near (x, y); false if there is no ground within the search radius
+  bool height(float x, float y, float *h) const {
+    if (nx_ == 0) return false;
+    const int ix = static_cast<int>(std::floor((x - min_x_) / cell_));
+    const int iy = static_cast<int>(std::floor((y - min_y_) / cell_));
+    for (int r = 0; r <= search_; ++r) {
+      float s = 0.f;
+      int n = 0;
+      for (int dx = -r; dx <= r; ++dx) {
+        for (int dy = -r; dy <= r; ++dy) {
+          if (std::max(std::abs(dx), std::abs(dy)) != r) continue;  // ring only
+          const int x2 = ix + dx, y2 = iy + dy;
+          if (x2 < 0 || y2 < 0 || x2 >= nx_ || y2 >= ny_) continue;
+          s += sum_[x2 * ny_ + y2];
+          n += count_[x2 * ny_ + y2];
+        }
+      }
+      if (n > 0) {
+        *h = s / static_cast<float>(n);
+        return true;
+      }
+    }
+    return false;
+  }
+
+ private:
+  int cellIndex(float x, float y) const {
+    const int ix = static_cast<int>((x - min_x_) / cell_),
+              iy = static_cast<int>((y - min_y_) / cell_);
+    return (ix < 0 || iy < 0 || ix >= nx_ || iy >= ny_) ? -1 : ix * ny_ + iy;
+  }
+
+  float cell_;
+  int search_;
+  float min_x_ = 0.f, min_y_ = 0.f;
+  int nx_ = 0, ny_ = 0;
+  std::vector<float> sum_;
+  std::vector<int> count_;
+};
+
+// Local elevation-map refinement. Moves non-ground points that lie within
 // `threshold` of the local ground height back to the ground set. This repairs
 // ground patches that a segmenter rejected as a whole (e.g. a Patchwork++ patch
 // containing a vehicle), which would otherwise merge into nearby clusters.
@@ -123,53 +199,14 @@ template <typename PointT>
 void refineGround(const pcl::PointCloud<PointT> &cloud, float threshold, pcl::Indices *ground,
                   pcl::Indices *obstacles, float cell = 1.f, int search_cells = 3) {
   if (ground->empty() || obstacles->empty()) return;
-  float min_x = std::numeric_limits<float>::max(), min_y = min_x;
-  float max_x = std::numeric_limits<float>::lowest(), max_y = max_x;
-  for (const auto &p : cloud.points) {
-    min_x = std::min(min_x, p.x);
-    min_y = std::min(min_y, p.y);
-    max_x = std::max(max_x, p.x);
-    max_y = std::max(max_y, p.y);
-  }
-  const int nx = static_cast<int>((max_x - min_x) / cell) + 1;
-  const int ny = static_cast<int>((max_y - min_y) / cell) + 1;
-  if (static_cast<int64_t>(nx) * ny > (int64_t{1} << 24)) return;
-  std::vector<float> sum(static_cast<size_t>(nx) * ny, 0.f);
-  std::vector<int> count(sum.size(), 0);
-  const auto cellOf = [&](const PointT &p, int *ix, int *iy) {
-    *ix = static_cast<int>((p.x - min_x) / cell);
-    *iy = static_cast<int>((p.y - min_y) / cell);
-  };
-  for (const auto i : *ground) {
-    int ix, iy;
-    cellOf(cloud.points[i], &ix, &iy);
-    sum[ix * ny + iy] += cloud.points[i].z;
-    count[ix * ny + iy]++;
-  }
-
+  GroundHeightMap map(cell, search_cells);
+  if (!map.build(cloud, *ground)) return;
   pcl::Indices still_obstacles;
   still_obstacles.reserve(obstacles->size());
   for (const auto i : *obstacles) {
     const auto &p = cloud.points[i];
-    int ix, iy;
-    cellOf(p, &ix, &iy);
-    // nearest ring of cells that contains ground
-    float height = std::numeric_limits<float>::quiet_NaN();
-    for (int r = 0; r <= search_cells && std::isnan(height); ++r) {
-      float s = 0.f;
-      int n = 0;
-      for (int dx = -r; dx <= r; ++dx) {
-        for (int dy = -r; dy <= r; ++dy) {
-          if (std::max(std::abs(dx), std::abs(dy)) != r) continue;  // ring only
-          const int x = ix + dx, y = iy + dy;
-          if (x < 0 || y < 0 || x >= nx || y >= ny) continue;
-          s += sum[x * ny + y];
-          n += count[x * ny + y];
-        }
-      }
-      if (n > 0) height = s / static_cast<float>(n);
-    }
-    if (!std::isnan(height) && p.z < height + threshold)
+    float height;
+    if (map.height(p.x, p.y, &height) && p.z < height + threshold)
       ground->push_back(i);
     else
       still_obstacles.push_back(i);
