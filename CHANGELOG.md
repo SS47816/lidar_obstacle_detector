@@ -19,6 +19,18 @@ algorithms for every stage and a reproducible benchmark. The v1 code is preserve
 - **Multi-object tracking**: constant-velocity Kalman filter, optimal (Hungarian)
   assignment on centre distance or BEV GIoU, track confirmation and coasting, velocity
   output. Optional fixed `tracking_frame` (e.g. `odom`) so velocities exclude ego motion.
+- **Heading from motion**: moving, stably tracked objects take their yaw from the tracked velocity
+  (front/back resolved; Autoware `orientation_availability = AVAILABLE`); other tracks keep the
+  L-shape yaw. **Shape completion**: partially visible objects keep the size seen earlier in their
+  track, anchored at the face towards the sensor.
+- **Height-aware BEV clustering** (columns split at vertical gaps, e.g. tree canopy over a car) and
+  **recursive splitting** of clusters larger than an object. What is still too large is reported as
+  a **structure**: not tracked, not in the object outputs, but in the occupancy outputs and markers.
+- **Occupancy outputs**: `nav_msgs/OccupancyGrid` with ray-cast free space (cells occupied by
+  obstacle points 0.2-2.5 m above the local ground) and 3D occupied voxels, in ROS 1 and ROS 2.
+- GIoU is the default association cost (about 10 % fewer ID switches than centre distance).
+- `tools/python/lod_bench/render_demo.py`: chase-camera and side-by-side demo videos from benchmark
+  runs.
 - Presets `legacy`, `fast` and `accurate`; one parameter table shared by ROS 1, ROS 2 and the
   benchmark CLI.
 - Benchmark on Argoverse 2 and nuScenes (`tools/`), GoogleTest unit tests, pixi environments,
@@ -42,5 +54,9 @@ algorithms for every stage and a reproducible benchmark. The v1 code is preserve
 - ROS 1: `use_pca_box`, `displacement_threshold` and `iou_threshold` are replaced by
   `box_method` and the `track_*` parameters. Topic parameter names are unchanged and now
   have defaults. New optional parameters: `preset`, `tracking_frame`, `markers_topic`.
+- With the `fast` and `accurate` presets, oversized clusters (walls, vegetation) are no longer
+  boxes in the object outputs but structures. Clusters above `cluster_max_size` points used to be
+  dropped silently; they are now split or reported as structures. Set `separate_structures: false`
+  to keep them as objects.
 - C++17; CMake >= 3.16. The package builds with `catkin_make`, `catkin build` (ROS 1),
   `colcon build` (ROS 2) or plain CMake.

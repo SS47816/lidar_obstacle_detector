@@ -50,36 +50,40 @@ like v1, so the difference between those rows comes from the bug fixes and the n
 
 ### nuscenes
 
-| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Runtime mean / p95 [ms] |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| v1 (AABB boxes) | 0.376 | 0.558 | 0.308 | 5.3% | 9.1% | 0.348 | 9.0 | 0.351 | 0.268 | 1476 | – | 0.907 | 5.5% | 6.6 / 8.3 |
-| v1 (PCA boxes) | 0.372 | 0.553 | 0.270 | 5.3% | 8.8% | 0.307 | 12.1 | 0.354 | 0.269 | 1460 | – | 0.907 | 5.5% | 6.6 / 8.3 |
-| v2 `legacy` | 0.375 | 0.555 | 0.305 | 5.2% | 9.2% | 0.348 | 9.0 | 0.556 | 0.417 | 455 | 0.45 | 0.908 | 5.4% | 6.6 / 8.5 |
-| v2 `fast` | 0.359 | 0.513 | 0.293 | 1.9% | 13.9% | 0.391 | 4.0 | 0.558 | 0.426 | 394 | 0.43 | 0.921 | 6.4% | 2.2 / 2.8 |
-| v2 `accurate` | 0.379 | 0.535 | 0.295 | 4.4% | 7.9% | 0.365 | 4.1 | 0.552 | 0.415 | 416 | 0.41 | 0.921 | 6.4% | 5.1 / 7.1 |
+| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Recall@1m >7m | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | Moving heading err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Structures / frame | Runtime mean / p95 [ms] |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| v1 (AABB boxes) | 0.376 | 0.558 | 0.308 | 0.264 | 5.3% | 9.1% | 0.348 | 9.0 | 101.4 | 0.351 | 0.268 | 1476 | – | 0.907 | 5.5% | 0.0 | 6.6 / 8.3 |
+| v1 (PCA boxes) | 0.372 | 0.553 | 0.270 | 0.295 | 5.3% | 8.8% | 0.307 | 12.1 | 112.5 | 0.354 | 0.269 | 1460 | – | 0.907 | 5.5% | 0.0 | 6.6 / 8.3 |
+| v2 `legacy` | 0.375 | 0.555 | 0.305 | 0.264 | 5.2% | 9.2% | 0.348 | 9.0 | 101.9 | 0.568 | 0.422 | 425 | 0.43 | 0.908 | 5.4% | 0.0 | 6.7 / 8.5 |
+| v2 `fast` | 0.415 | 0.548 | 0.357 | 0.384 | 3.4% | 11.1% | 0.426 | 4.0 | 15.9 | 0.585 | 0.442 | 363 | 0.41 | 0.921 | 6.4% | 0.6 | 2.7 / 3.2 |
+| v2 `accurate` | 0.408 | 0.547 | 0.344 | 0.339 | 4.8% | 7.9% | 0.408 | 4.1 | 18.5 | 0.568 | 0.418 | 390 | 0.41 | 0.921 | 6.4% | 0.3 | 6.1 / 8.9 |
 
 ### av2
 
-| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Runtime mean / p95 [ms] |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| v1 (AABB boxes) | 0.534 | 0.743 | 0.423 | 15.9% | 28.2% | 0.370 | 6.2 | 0.204 | 0.293 | 11822 | – | – | 25.4% | 27.9 / 36.1 |
-| v1 (PCA boxes) | 0.531 | 0.744 | 0.400 | 16.1% | 26.2% | 0.344 | 14.5 | 0.200 | 0.286 | 12223 | – | – | 25.4% | 27.8 / 35.1 |
-| v2 `legacy` | 0.531 | 0.742 | 0.420 | 15.9% | 28.1% | 0.368 | 6.2 | 0.484 | 0.416 | 4987 | 0.58 | – | 26.3% | 27.9 / 35.9 |
-| v2 `fast` | 0.603 | 0.773 | 0.555 | 4.2% | 16.5% | 0.493 | 6.7 | 0.691 | 0.686 | 1760 | 0.36 | – | 4.8% | 6.1 / 7.6 |
-| v2 `accurate` | 0.659 | 0.825 | 0.581 | 8.5% | 12.2% | 0.489 | 6.4 | 0.688 | 0.673 | 1736 | 0.32 | – | 4.8% | 24.0 / 34.5 |
+| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Recall@1m >7m | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | Moving heading err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Structures / frame | Runtime mean / p95 [ms] |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| v1 (AABB boxes) | 0.534 | 0.743 | 0.423 | 0.348 | 15.9% | 28.2% | 0.370 | 6.2 | 89.6 | 0.204 | 0.293 | 11822 | – | – | 25.4% | 0.0 | 27.9 / 36.1 |
+| v1 (PCA boxes) | 0.531 | 0.744 | 0.400 | 0.294 | 16.1% | 26.2% | 0.344 | 14.5 | 97.3 | 0.200 | 0.286 | 12223 | – | – | 25.4% | 0.0 | 27.8 / 35.1 |
+| v2 `legacy` | 0.531 | 0.742 | 0.420 | 0.356 | 15.9% | 28.1% | 0.368 | 6.2 | 90.1 | 0.506 | 0.422 | 4653 | 0.56 | – | 26.3% | 0.0 | 28.8 / 37.4 |
+| v2 `fast` | 0.661 | 0.818 | 0.617 | 0.543 | 5.3% | 9.7% | 0.512 | 5.9 | 13.9 | 0.725 | 0.709 | 1725 | 0.35 | – | 4.8% | 1.9 | 7.5 / 8.9 |
+| v2 `accurate` | 0.697 | 0.849 | 0.628 | 0.510 | 9.4% | 8.6% | 0.508 | 5.7 | 14.4 | 0.710 | 0.676 | 1749 | 0.32 | – | 4.8% | 1.2 | 31.8 / 50.8 |
 
 
 **Takeaways**
 
-- **Tracking**: the new tracker alone (v1 → v2 `legacy`) raises IDF1\* from 0.35 to 0.56
-  (nuScenes) and from 0.20 to 0.48 (AV2), and cuts ID switches by 58–69 %.
+- **Tracking**: the new tracker alone (v1 → v2 `legacy`) cuts ID switches by 61–71 % (IDF1\* 0.35 → 0.57
+  on nuScenes, 0.20 → 0.51 on AV2).
+  With the full `fast` preset, IDF1\* goes from 0.35 to 0.59 (nuScenes) and from 0.20 to 0.73 (AV2),
+  and ID switches drop by 75–85 %.
 - **Ground segmentation** is the largest single gain on AV2's hilly Pittsburgh logs: RANSAC's
   single plane labels 25 % of object points as ground; Patchwork++ with refinement, under 5 %.
-- **Speed**: `fast` is 3.0× (nuScenes) to 4.6× (AV2) faster than v1, mostly from the BEV-grid
-  clusterer (0.15–0.4 ms instead of 3.5–18 ms).
-- **nuScenes recall barely moves with the default presets.** Almost half of its objects have
-  fewer than 20 points, so `cluster_min_size` is the limit there; see the sensitivity table
-  below and the sparse-lidar rows in the README (recall@1m up to 0.53).
+- **Detection**: recall@1m 0.53 → 0.66 (`fast`) / 0.70 (`accurate`) on AV2 and 0.38 → 0.42 on
+  nuScenes, with under-segmentation on AV2 down from 28 % to about 10 %.
+- **Speed**: `fast` is 2.4× (nuScenes) to 3.7× (AV2) faster than v1, including the occupancy grid
+  (0.5–1.2 ms). `accurate` is about as slow as v1 (24 ms of its 32 ms on AV2 go to KD-tree
+  clustering, including re-splitting oversized clusters) and is the next optimisation target.
+- **nuScenes recall is limited by sparsity.** Almost half of its objects have fewer than 20 points,
+  so `cluster_min_size` is the limit; the sparse-lidar tuning raises recall@1m to 0.57.
 
 ## Ablations
 
@@ -88,41 +92,60 @@ jobs, so runtimes are not reported.
 
 ### nuscenes
 
-| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `fast` (Patchwork++ · refine · BEV grid · L-shape · KF, centre cost) | 0.359 | 0.513 | 0.293 | 1.9% | 13.9% | 0.391 | 4.0 | 0.558 | 0.426 | 394 | 0.43 | 0.921 | 6.4% |
-| ground: constrained RANSAC, no refine | 0.362 | 0.532 | 0.296 | 2.1% | 16.3% | 0.380 | 4.4 | 0.556 | 0.437 | 450 | 0.48 | 0.914 | 5.6% |
-| ground: v1 RANSAC (30 it., unconstrained), no refine | 0.359 | 0.530 | 0.294 | 2.1% | 16.5% | 0.379 | 4.5 | 0.553 | 0.434 | 458 | 0.49 | 0.908 | 5.4% |
-| no elevation-map refinement | 0.344 | 0.522 | 0.288 | 2.2% | 16.1% | 0.374 | 5.1 | 0.521 | 0.414 | 518 | 0.55 | 0.889 | 2.8% |
-| clustering: adaptive Euclidean | 0.378 | 0.534 | 0.294 | 4.4% | 7.9% | 0.365 | 4.1 | 0.552 | 0.414 | 417 | 0.41 | 0.921 | 6.4% |
-| boxes: axis-aligned | 0.352 | 0.512 | 0.303 | 1.9% | 14.0% | 0.380 | 9.0 | 0.553 | 0.423 | 393 | 0.44 | 0.921 | 6.4% |
-| boxes: PCA | 0.349 | 0.509 | 0.275 | 1.9% | 13.7% | 0.348 | 12.1 | 0.551 | 0.425 | 393 | 0.43 | 0.921 | 6.4% |
-| tracking cost: BEV GIoU | 0.359 | 0.513 | 0.293 | 1.9% | 13.9% | 0.391 | 4.0 | 0.555 | 0.430 | 372 | 0.43 | 0.921 | 6.4% |
-| no tracking | 0.359 | 0.513 | 0.293 | 1.9% | 13.9% | 0.391 | 4.0 | 0.159 | 0.122 | 2428 | – | 0.921 | 6.4% |
+| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Recall@1m >7m | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | Moving heading err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Structures / frame |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `fast` (all v2.1 defaults) | 0.415 | 0.548 | 0.357 | 0.384 | 3.4% | 11.1% | 0.426 | 4.0 | 15.9 | 0.585 | 0.442 | 363 | 0.41 | 0.921 | 6.4% | 0.6 |
+| no heading from motion | 0.415 | 0.548 | 0.355 | 0.376 | 3.4% | 11.1% | 0.424 | 4.2 | 100.4 | 0.583 | 0.441 | 366 | 0.41 | 0.921 | 6.4% | 0.6 |
+| no shape completion | 0.385 | 0.542 | 0.307 | 0.334 | 3.3% | 10.3% | 0.380 | 4.1 | 16.1 | 0.570 | 0.434 | 380 | 0.40 | 0.921 | 6.4% | 0.6 |
+| no height-gap split | 0.406 | 0.542 | 0.352 | 0.402 | 3.0% | 11.8% | 0.427 | 4.1 | 16.4 | 0.579 | 0.436 | 385 | 0.41 | 0.921 | 6.4% | 0.7 |
+| no oversized-cluster split | 0.398 | 0.526 | 0.342 | 0.373 | 2.1% | 10.7% | 0.433 | 3.8 | 15.9 | 0.579 | 0.444 | 336 | 0.41 | 0.921 | 6.4% | 1.3 |
+| structures kept as objects | 0.415 | 0.548 | 0.357 | 0.381 | 3.4% | 11.5% | 0.425 | 4.0 | 15.9 | 0.585 | 0.443 | 360 | 0.41 | 0.921 | 6.4% | 0.0 |
+| object_max_length 12 m | 0.417 | 0.551 | 0.356 | 0.366 | 3.5% | 10.3% | 0.423 | 4.1 | 15.7 | 0.583 | 0.439 | 384 | 0.41 | 0.921 | 6.4% | 1.0 |
+| object_max_length 20 m | 0.415 | 0.547 | 0.357 | 0.379 | 3.4% | 11.3% | 0.426 | 4.0 | 15.9 | 0.585 | 0.442 | 360 | 0.41 | 0.921 | 6.4% | 0.3 |
+| ground: constrained RANSAC, no refine | 0.418 | 0.577 | 0.362 | 0.379 | 3.9% | 12.0% | 0.409 | 4.5 | 17.3 | 0.592 | 0.451 | 426 | 0.45 | 0.914 | 5.6% | 0.9 |
+| ground: v1 RANSAC, no refine | 0.419 | 0.580 | 0.363 | 0.379 | 4.1% | 12.3% | 0.406 | 4.6 | 17.9 | 0.590 | 0.451 | 443 | 0.46 | 0.908 | 5.4% | 0.9 |
+| no elevation-map refinement | 0.401 | 0.567 | 0.352 | 0.352 | 3.9% | 12.3% | 0.399 | 4.9 | 17.1 | 0.564 | 0.432 | 489 | 0.51 | 0.889 | 2.8% | 0.7 |
+| clustering: adaptive Euclidean | 0.407 | 0.546 | 0.343 | 0.334 | 4.8% | 7.9% | 0.407 | 4.1 | 18.2 | 0.568 | 0.418 | 387 | 0.41 | 0.921 | 6.4% | 0.3 |
+| boxes: axis-aligned | 0.412 | 0.546 | 0.370 | 0.355 | 3.4% | 11.6% | 0.420 | 7.1 | 17.9 | 0.584 | 0.438 | 391 | 0.40 | 0.921 | 6.4% | 0.6 |
+| boxes: PCA | 0.396 | 0.543 | 0.326 | 0.360 | 3.4% | 11.3% | 0.379 | 10.5 | 14.4 | 0.579 | 0.433 | 369 | 0.40 | 0.921 | 6.4% | 0.6 |
+| tracking cost: centre distance | 0.413 | 0.548 | 0.353 | 0.366 | 3.3% | 11.2% | 0.423 | 4.1 | 16.3 | 0.575 | 0.435 | 397 | 0.41 | 0.921 | 6.4% | 0.6 |
+| no tracking | 0.385 | 0.542 | 0.307 | 0.334 | 3.3% | 10.4% | 0.380 | 4.2 | 107.5 | 0.154 | 0.079 | 2732 | – | 0.921 | 6.4% | 0.6 |
 
 ### av2
 
-| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `fast` (Patchwork++ · refine · BEV grid · L-shape · KF, centre cost) | 0.603 | 0.773 | 0.555 | 4.2% | 16.5% | 0.493 | 6.7 | 0.691 | 0.686 | 1760 | 0.36 | – | 4.8% |
-| ground: constrained RANSAC, no refine | 0.370 | 0.543 | 0.323 | 3.4% | 31.7% | 0.402 | 9.5 | 0.467 | 0.436 | 3372 | 0.60 | – | 25.4% |
-| ground: v1 RANSAC (30 it., unconstrained), no refine | 0.322 | 0.496 | 0.275 | 3.2% | 35.1% | 0.375 | 10.2 | 0.409 | 0.377 | 4143 | 0.73 | – | 26.3% |
-| no elevation-map refinement | 0.583 | 0.765 | 0.546 | 4.0% | 18.7% | 0.484 | 7.1 | 0.665 | 0.674 | 1931 | 0.40 | – | 2.0% |
-| clustering: adaptive Euclidean | 0.653 | 0.824 | 0.569 | 9.1% | 11.9% | 0.480 | 6.4 | 0.682 | 0.662 | 1834 | 0.32 | – | 4.8% |
-| boxes: axis-aligned | 0.599 | 0.772 | 0.567 | 4.2% | 17.4% | 0.494 | 5.8 | 0.695 | 0.686 | 1738 | 0.35 | – | 4.8% |
-| boxes: PCA | 0.597 | 0.772 | 0.551 | 4.2% | 17.2% | 0.460 | 12.1 | 0.692 | 0.686 | 1739 | 0.35 | – | 4.8% |
-| tracking cost: BEV GIoU | 0.603 | 0.773 | 0.555 | 4.2% | 16.5% | 0.493 | 6.7 | 0.709 | 0.688 | 1630 | 0.35 | – | 4.8% |
-| no tracking | 0.603 | 0.773 | 0.555 | 4.2% | 16.5% | 0.493 | 6.7 | 0.099 | 0.074 | 34147 | – | – | 4.8% |
+| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Recall@1m >7m | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | Moving heading err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Structures / frame |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `fast` (all v2.1 defaults) | 0.661 | 0.818 | 0.617 | 0.543 | 5.3% | 9.7% | 0.512 | 5.9 | 13.9 | 0.725 | 0.709 | 1725 | 0.35 | – | 4.8% | 1.9 |
+| no heading from motion | 0.660 | 0.818 | 0.616 | 0.535 | 5.3% | 9.7% | 0.510 | 6.5 | 77.9 | 0.724 | 0.709 | 1742 | 0.35 | – | 4.8% | 1.9 |
+| no shape completion | 0.652 | 0.821 | 0.588 | 0.479 | 5.3% | 9.0% | 0.495 | 5.9 | 14.3 | 0.724 | 0.712 | 1663 | 0.35 | – | 4.8% | 1.9 |
+| no height-gap split | 0.636 | 0.801 | 0.599 | 0.529 | 4.7% | 9.8% | 0.506 | 6.1 | 14.1 | 0.718 | 0.704 | 1842 | 0.35 | – | 4.8% | 2.1 |
+| no oversized-cluster split | 0.637 | 0.783 | 0.600 | 0.506 | 4.8% | 8.0% | 0.521 | 5.9 | 13.9 | 0.717 | 0.689 | 1586 | 0.34 | – | 4.8% | 3.2 |
+| structures kept as objects | 0.662 | 0.821 | 0.618 | 0.542 | 5.4% | 13.2% | 0.511 | 5.9 | 13.9 | 0.727 | 0.710 | 1761 | 0.35 | – | 4.8% | 0.0 |
+| object_max_length 12 m | 0.664 | 0.820 | 0.619 | 0.547 | 5.3% | 8.9% | 0.513 | 5.9 | 14.1 | 0.728 | 0.711 | 1717 | 0.35 | – | 4.8% | 2.6 |
+| object_max_length 20 m | 0.661 | 0.818 | 0.618 | 0.530 | 5.3% | 10.0% | 0.512 | 5.9 | 13.8 | 0.725 | 0.708 | 1726 | 0.35 | – | 4.8% | 1.7 |
+| ground: constrained RANSAC, no refine | 0.449 | 0.658 | 0.400 | 0.421 | 6.3% | 11.7% | 0.388 | 9.3 | 26.6 | 0.508 | 0.484 | 4420 | 0.62 | – | 25.4% | 4.0 |
+| ground: v1 RANSAC, no refine | 0.409 | 0.633 | 0.358 | 0.354 | 6.3% | 12.3% | 0.359 | 10.1 | 32.1 | 0.459 | 0.441 | 5301 | 0.74 | – | 26.3% | 4.9 |
+| no elevation-map refinement | 0.646 | 0.819 | 0.612 | 0.490 | 5.5% | 10.7% | 0.489 | 6.4 | 14.9 | 0.702 | 0.704 | 1858 | 0.38 | – | 2.0% | 2.1 |
+| clustering: adaptive Euclidean | 0.691 | 0.848 | 0.618 | 0.510 | 9.9% | 8.3% | 0.500 | 5.7 | 15.2 | 0.706 | 0.664 | 1832 | 0.32 | – | 4.8% | 1.1 |
+| boxes: axis-aligned | 0.665 | 0.816 | 0.637 | 0.515 | 5.2% | 10.6% | 0.515 | 5.5 | 15.2 | 0.729 | 0.713 | 1677 | 0.34 | – | 4.8% | 1.9 |
+| boxes: PCA | 0.656 | 0.816 | 0.611 | 0.438 | 5.3% | 9.1% | 0.487 | 10.4 | 13.7 | 0.726 | 0.709 | 1740 | 0.34 | – | 4.8% | 1.9 |
+| tracking cost: centre distance | 0.660 | 0.818 | 0.617 | 0.504 | 5.3% | 9.6% | 0.513 | 5.9 | 14.7 | 0.707 | 0.707 | 1917 | 0.35 | – | 4.8% | 1.9 |
+| no tracking | 0.652 | 0.821 | 0.588 | 0.479 | 5.3% | 9.0% | 0.495 | 6.5 | 92.4 | 0.085 | 0.028 | 37969 | – | – | 4.8% | 1.9 |
 
-- Patchwork++ and the refinement matter most on AV2. Constrained RANSAC beats the v1
-  unconstrained RANSAC, but both lose about a quarter of the object points on slopes.
-- Adaptive Euclidean clustering (`accurate`) has the best recall and under-segmentation, at
-  3.5–18 ms instead of 0.15–0.4 ms.
-- L-shape fitting halves the vehicle yaw error on nuScenes (9.0° → 4.0°). On AV2, where most
-  vehicles are aligned with the ego lane, axis-aligned boxes are slightly better (5.8° vs 6.7°);
-  PCA is the worst everywhere.
-- GIoU association reduces ID switches by 6–7 % on both datasets. It is available as
-  `track_cost: giou`.
+- **Heading from motion** cuts the heading error of moving vehicles from 78° to 14° (AV2) and from
+  100° to 16° (nuScenes), at no cost elsewhere. Stationary or unstably tracked objects keep the
+  L-shape yaw.
+- **Shape completion** improves BEV IoU (+0.017 AV2, +0.046 nuScenes) and recall@IoU.3 (+0.03 /
+  +0.05), at the cost of about 4 % more ID switches on AV2.
+- **The height-gap split and the oversized-cluster split** each add about 0.025 recall@1m on AV2. The
+  height gap also removes 120 ID switches. The oversized split makes more objects to track, so it
+  adds about 140 switches. `object_max_length` between 12 and 20 m makes little difference.
+- **Ground**: on flat nuScenes, constrained RANSAC is on par with Patchwork++. On AV2's slopes
+  Patchwork++ is decisive (recall@1m 0.45 → 0.66), and the refinement step helps on both datasets.
+- **Boxes**: L-shape halves the vehicle yaw error on nuScenes compared with axis-aligned boxes
+  (4.0° vs 7.1°). On AV2, where most vehicles are lane-aligned, axis-aligned boxes are slightly
+  better (5.5° vs 5.9°). PCA is the worst everywhere.
+- **GIoU association** (the default) has 9–10 % fewer ID switches than centre distance.
 
 ## Parameter sensitivity
 
@@ -131,66 +154,61 @@ are not reported.
 
 ### nuscenes
 
-| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `accurate`: preset defaults | 0.379 | 0.535 | 0.295 | 4.4% | 7.9% | 0.366 | 4.1 | 0.552 | 0.415 | 415 | 0.41 | 0.921 | 6.7% |
-| `accurate`: cluster_range_gain=0 | 0.378 | 0.534 | 0.294 | 4.4% | 7.9% | 0.365 | 4.1 | 0.552 | 0.414 | 417 | 0.41 | 0.921 | 6.7% |
-| `accurate`: cluster_range_gain=0.04 | 0.405 | 0.569 | 0.325 | 3.4% | 9.6% | 0.378 | 4.2 | 0.581 | 0.456 | 400 | 0.42 | 0.921 | 6.7% |
-| `accurate`: cluster_min_size=3 | 0.579 | 0.833 | 0.310 | 23.3% | 8.1% | 0.255 | 6.7 | 0.569 | 0.346 | 1000 | 0.43 | 0.921 | 6.7% |
-| `accurate`: cluster_min_size=5 | 0.504 | 0.739 | 0.308 | 12.3% | 8.1% | 0.287 | 5.6 | 0.587 | 0.461 | 744 | 0.40 | 0.921 | 6.7% |
-| `accurate`: cluster_min_size=5, voxel_grid_size=0.1 | 0.523 | 0.755 | 0.320 | 14.1% | 8.7% | 0.290 | 5.6 | 0.586 | 0.439 | 801 | 0.40 | 0.918 | 9.4% |
-| `accurate`: cluster_threshold=0.4 | 0.353 | 0.502 | 0.239 | 11.1% | 3.4% | 0.308 | 4.2 | 0.479 | 0.281 | 493 | 0.45 | 0.921 | 6.7% |
-| `accurate`: cluster_threshold=0.8 | 0.377 | 0.525 | 0.311 | 2.3% | 13.7% | 0.394 | 4.0 | 0.571 | 0.442 | 344 | 0.40 | 0.921 | 6.7% |
-| `accurate`: voxel_grid_size=0.1 | 0.405 | 0.582 | 0.309 | 5.5% | 8.6% | 0.352 | 4.2 | 0.575 | 0.443 | 435 | 0.38 | 0.918 | 9.4% |
-| `fast`: preset defaults | 0.359 | 0.513 | 0.293 | 1.9% | 13.9% | 0.391 | 4.0 | 0.558 | 0.426 | 394 | 0.43 | 0.921 | 6.7% |
-| `fast`: cluster_cell_size=0.15 | 0.361 | 0.508 | 0.300 | 1.5% | 15.2% | 0.400 | 4.0 | 0.562 | 0.432 | 365 | 0.44 | 0.921 | 6.7% |
-| `fast`: cluster_cell_size=0.35 | 0.372 | 0.537 | 0.298 | 3.4% | 9.9% | 0.369 | 4.1 | 0.563 | 0.430 | 425 | 0.42 | 0.921 | 6.7% |
-| `fast`: cluster_range_gain=0 | 0.358 | 0.512 | 0.293 | 1.9% | 13.9% | 0.391 | 4.0 | 0.558 | 0.426 | 389 | 0.43 | 0.921 | 6.7% |
-| `fast`: cluster_range_gain=0.04 | 0.376 | 0.531 | 0.314 | 1.6% | 15.5% | 0.402 | 4.1 | 0.577 | 0.451 | 363 | 0.44 | 0.921 | 6.7% |
-| `fast`: cluster_min_size=3 | 0.518 | 0.779 | 0.306 | 13.7% | 14.1% | 0.282 | 6.5 | 0.609 | 0.493 | 817 | 0.43 | 0.921 | 6.7% |
-| `fast`: cluster_min_size=5 | 0.465 | 0.703 | 0.305 | 6.6% | 14.1% | 0.312 | 5.3 | 0.611 | 0.524 | 667 | 0.42 | 0.921 | 6.7% |
-| `fast`: cluster_min_size=5, voxel_grid_size=0.1 | 0.473 | 0.710 | 0.310 | 8.0% | 15.3% | 0.312 | 5.5 | 0.612 | 0.521 | 666 | 0.42 | 0.918 | 9.4% |
-| `fast`: ground_refine_threshold=0.15 | 0.358 | 0.513 | 0.291 | 1.9% | 14.1% | 0.390 | 4.1 | 0.553 | 0.427 | 387 | 0.44 | 0.921 | 5.1% |
-| `fast`: ground_refine_threshold=0.3 | 0.356 | 0.508 | 0.289 | 1.9% | 13.2% | 0.387 | 3.8 | 0.554 | 0.427 | 385 | 0.44 | 0.909 | 10.6% |
-| `fast`: cluster_threshold=0.4 | 0.374 | 0.541 | 0.272 | 5.6% | 6.3% | 0.334 | 4.3 | 0.533 | 0.387 | 496 | 0.42 | 0.921 | 6.7% |
-| `fast`: cluster_threshold=0.8 | 0.340 | 0.478 | 0.285 | 0.7% | 21.9% | 0.411 | 4.1 | 0.547 | 0.421 | 320 | 0.47 | 0.921 | 6.7% |
-| `fast`: voxel_grid_size=0.1 | 0.376 | 0.546 | 0.299 | 2.5% | 15.1% | 0.377 | 4.2 | 0.564 | 0.449 | 408 | 0.43 | 0.918 | 9.4% |
-| `fast`: cluster_min_size=5, cluster_range_gain=0.04 | 0.475 | 0.707 | 0.327 | 5.5% | 15.7% | 0.330 | 5.3 | 0.623 | 0.545 | 647 | 0.45 | 0.921 | 6.4% |
-| `accurate`: cluster_min_size=5, cluster_range_gain=0.04 | 0.533 | 0.774 | 0.342 | 9.3% | 9.9% | 0.306 | 5.6 | 0.625 | 0.530 | 697 | 0.42 | 0.921 | 6.4% |
+| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Recall@1m >7m | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | Moving heading err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Structures / frame |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `accurate`: preset defaults | 0.408 | 0.547 | 0.344 | 0.339 | 4.8% | 7.9% | 0.408 | 4.1 | 18.5 | 0.568 | 0.418 | 390 | 0.41 | 0.921 | 6.4% | 0.3 |
+| `accurate`: cluster_range_gain=0 | 0.407 | 0.546 | 0.343 | 0.334 | 4.8% | 7.9% | 0.407 | 4.1 | 18.2 | 0.568 | 0.418 | 387 | 0.41 | 0.921 | 6.4% | 0.3 |
+| `accurate`: cluster_range_gain=0.04 | 0.440 | 0.580 | 0.382 | 0.420 | 3.8% | 9.4% | 0.425 | 4.1 | 15.2 | 0.594 | 0.455 | 393 | 0.41 | 0.921 | 6.4% | 0.5 |
+| `accurate`: cluster_min_size=3 | 0.607 | 0.849 | 0.362 | 0.392 | 23.7% | 8.0% | 0.288 | 6.4 | 22.9 | 0.565 | 0.314 | 973 | 0.39 | 0.921 | 6.4% | 0.3 |
+| `accurate`: cluster_min_size=5 | 0.538 | 0.756 | 0.364 | 0.368 | 12.9% | 8.0% | 0.327 | 5.3 | 19.5 | 0.613 | 0.451 | 677 | 0.38 | 0.921 | 6.4% | 0.3 |
+| `accurate`: cluster_threshold=0.4 | 0.379 | 0.507 | 0.284 | 0.287 | 11.2% | 3.5% | 0.357 | 4.0 | 22.6 | 0.506 | 0.289 | 414 | 0.40 | 0.921 | 6.4% | 0.2 |
+| `accurate`: cluster_threshold=0.8 | 0.419 | 0.549 | 0.362 | 0.399 | 3.2% | 12.7% | 0.432 | 3.9 | 16.4 | 0.579 | 0.436 | 371 | 0.40 | 0.921 | 6.4% | 0.2 |
+| `accurate`: voxel_grid_size=0.1 | 0.439 | 0.596 | 0.361 | 0.355 | 6.0% | 8.4% | 0.391 | 4.2 | 18.2 | 0.585 | 0.433 | 437 | 0.38 | 0.918 | 8.5% | 0.3 |
+| `fast`: preset defaults | 0.415 | 0.548 | 0.357 | 0.384 | 3.4% | 11.1% | 0.426 | 4.0 | 15.9 | 0.585 | 0.442 | 363 | 0.41 | 0.921 | 6.4% | 0.6 |
+| `fast`: cluster_cell_size=0.15 | 0.414 | 0.544 | 0.361 | 0.423 | 2.7% | 13.2% | 0.435 | 4.0 | 14.4 | 0.585 | 0.454 | 361 | 0.42 | 0.921 | 6.4% | 0.6 |
+| `fast`: cluster_cell_size=0.35 | 0.412 | 0.555 | 0.346 | 0.358 | 3.8% | 8.8% | 0.407 | 4.1 | 17.2 | 0.585 | 0.446 | 393 | 0.41 | 0.921 | 6.4% | 0.8 |
+| `fast`: cluster_range_gain=0 | 0.415 | 0.547 | 0.356 | 0.381 | 3.4% | 11.1% | 0.426 | 4.0 | 16.2 | 0.584 | 0.442 | 360 | 0.40 | 0.921 | 6.4% | 0.6 |
+| `fast`: cluster_range_gain=0.04 | 0.436 | 0.569 | 0.378 | 0.441 | 2.9% | 12.3% | 0.436 | 4.1 | 15.6 | 0.600 | 0.464 | 388 | 0.42 | 0.921 | 6.4% | 0.8 |
+| `fast`: cluster_min_size=3 | 0.589 | 0.835 | 0.374 | 0.415 | 16.4% | 11.4% | 0.310 | 6.3 | 18.6 | 0.634 | 0.476 | 811 | 0.39 | 0.921 | 6.4% | 0.5 |
+| `fast`: cluster_min_size=5 | 0.534 | 0.754 | 0.377 | 0.394 | 8.7% | 11.5% | 0.345 | 5.3 | 17.9 | 0.648 | 0.533 | 637 | 0.39 | 0.921 | 6.4% | 0.5 |
+| `fast`: ground_refine_threshold=0.15 | 0.411 | 0.549 | 0.354 | 0.376 | 3.5% | 11.3% | 0.424 | 4.1 | 15.6 | 0.581 | 0.439 | 373 | 0.42 | 0.921 | 4.9% | 0.6 |
+| `fast`: ground_refine_threshold=0.3 | 0.410 | 0.541 | 0.349 | 0.381 | 3.4% | 10.6% | 0.422 | 4.0 | 16.8 | 0.580 | 0.435 | 365 | 0.41 | 0.908 | 10.1% | 0.5 |
+| `fast`: cluster_threshold=0.4 | 0.407 | 0.554 | 0.326 | 0.329 | 6.6% | 5.5% | 0.379 | 4.3 | 18.4 | 0.566 | 0.401 | 410 | 0.42 | 0.921 | 6.4% | 0.4 |
+| `fast`: cluster_threshold=0.8 | 0.402 | 0.534 | 0.353 | 0.405 | 2.7% | 17.1% | 0.434 | 4.2 | 15.8 | 0.575 | 0.436 | 361 | 0.45 | 0.921 | 6.4% | 0.5 |
+| `fast`: voxel_grid_size=0.1 | 0.435 | 0.590 | 0.368 | 0.394 | 4.1% | 11.8% | 0.407 | 4.4 | 15.7 | 0.597 | 0.463 | 419 | 0.39 | 0.918 | 8.5% | 0.6 |
+| `fast`: cluster_min_size=5, cluster_range_gain=0.04 | 0.550 | 0.764 | 0.406 | 0.449 | 7.6% | 12.7% | 0.363 | 5.2 | 17.0 | 0.655 | 0.552 | 674 | 0.43 | 0.921 | 6.4% | 0.7 |
+| `accurate`: cluster_min_size=5, cluster_range_gain=0.04 | 0.572 | 0.791 | 0.408 | 0.439 | 9.9% | 9.7% | 0.348 | 5.3 | 18.7 | 0.648 | 0.521 | 626 | 0.39 | 0.921 | 6.4% | 0.4 |
 
 ### av2
 
-| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `accurate`: preset defaults | 0.659 | 0.825 | 0.581 | 8.5% | 12.2% | 0.489 | 6.4 | 0.688 | 0.673 | 1739 | 0.33 | – | 5.3% |
-| `accurate`: cluster_range_gain=0 | 0.653 | 0.824 | 0.569 | 9.1% | 11.9% | 0.480 | 6.4 | 0.682 | 0.662 | 1834 | 0.32 | – | 5.3% |
-| `accurate`: cluster_range_gain=0.04 | 0.628 | 0.763 | 0.584 | 3.6% | 20.3% | 0.527 | 6.2 | 0.692 | 0.679 | 1504 | 0.33 | – | 5.3% |
-| `accurate`: cluster_min_size=3 | 0.733 | 0.900 | 0.582 | 27.2% | 12.2% | 0.442 | 7.5 | 0.598 | 0.455 | 2805 | 0.38 | – | 5.3% |
-| `accurate`: cluster_min_size=5 | 0.706 | 0.876 | 0.582 | 18.0% | 12.2% | 0.459 | 7.0 | 0.652 | 0.584 | 2335 | 0.34 | – | 5.3% |
-| `accurate`: cluster_min_size=5, voxel_grid_size=0.1 | 0.711 | 0.882 | 0.598 | 20.1% | 9.5% | 0.462 | 7.3 | 0.637 | 0.562 | 2322 | 0.35 | – | 4.2% |
-| `accurate`: cluster_threshold=0.4 | 0.675 | 0.847 | 0.581 | 16.1% | 9.4% | 0.467 | 6.5 | 0.630 | 0.580 | 2161 | 0.35 | – | 5.3% |
-| `accurate`: cluster_threshold=0.8 | 0.633 | 0.791 | 0.576 | 4.8% | 16.2% | 0.504 | 6.4 | 0.701 | 0.697 | 1532 | 0.34 | – | 5.3% |
-| `accurate`: voxel_grid_size=0.1 | 0.673 | 0.841 | 0.598 | 10.7% | 9.5% | 0.488 | 6.7 | 0.675 | 0.658 | 1746 | 0.32 | – | 4.2% |
-| `fast`: preset defaults | 0.603 | 0.773 | 0.555 | 4.2% | 16.5% | 0.493 | 6.7 | 0.691 | 0.686 | 1761 | 0.36 | – | 5.3% |
-| `fast`: cluster_cell_size=0.15 | 0.593 | 0.761 | 0.548 | 3.5% | 17.8% | 0.496 | 6.7 | 0.691 | 0.687 | 1615 | 0.36 | – | 5.3% |
-| `fast`: cluster_cell_size=0.35 | 0.619 | 0.797 | 0.564 | 6.0% | 14.3% | 0.486 | 6.7 | 0.687 | 0.684 | 1938 | 0.36 | – | 5.3% |
-| `fast`: cluster_range_gain=0 | 0.602 | 0.775 | 0.551 | 4.4% | 16.2% | 0.490 | 6.7 | 0.691 | 0.685 | 1770 | 0.35 | – | 5.3% |
-| `fast`: cluster_range_gain=0.04 | 0.545 | 0.683 | 0.522 | 1.7% | 27.6% | 0.519 | 6.5 | 0.655 | 0.630 | 1581 | 0.38 | – | 5.3% |
-| `fast`: cluster_min_size=3 | 0.653 | 0.839 | 0.555 | 14.6% | 16.5% | 0.454 | 7.5 | 0.642 | 0.611 | 2568 | 0.39 | – | 5.3% |
-| `fast`: cluster_min_size=5 | 0.634 | 0.817 | 0.555 | 9.0% | 16.5% | 0.468 | 7.2 | 0.669 | 0.664 | 2174 | 0.37 | – | 5.3% |
-| `fast`: cluster_min_size=5, voxel_grid_size=0.1 | 0.634 | 0.817 | 0.565 | 10.1% | 12.5% | 0.470 | 7.6 | 0.666 | 0.654 | 2124 | 0.37 | – | 4.2% |
-| `fast`: ground_refine_threshold=0.15 | 0.604 | 0.774 | 0.558 | 4.2% | 16.8% | 0.495 | 6.6 | 0.692 | 0.687 | 1753 | 0.36 | – | 4.6% |
-| `fast`: ground_refine_threshold=0.3 | 0.596 | 0.767 | 0.547 | 4.1% | 15.9% | 0.489 | 6.7 | 0.687 | 0.681 | 1756 | 0.36 | – | 7.4% |
-| `fast`: cluster_threshold=0.4 | 0.639 | 0.815 | 0.575 | 8.6% | 12.3% | 0.483 | 6.6 | 0.669 | 0.662 | 1958 | 0.36 | – | 5.3% |
-| `fast`: cluster_threshold=0.8 | 0.544 | 0.694 | 0.509 | 1.8% | 25.1% | 0.503 | 6.6 | 0.662 | 0.641 | 1591 | 0.39 | – | 5.3% |
-| `fast`: voxel_grid_size=0.1 | 0.609 | 0.781 | 0.564 | 5.0% | 12.5% | 0.492 | 7.1 | 0.686 | 0.685 | 1733 | 0.35 | – | 4.2% |
-| `fast`: cluster_min_size=5, cluster_range_gain=0.04 | 0.561 | 0.712 | 0.523 | 3.3% | 27.6% | 0.501 | 6.8 | 0.658 | 0.637 | 1803 | 0.39 | – | 4.8% |
-| `accurate`: cluster_min_size=5, cluster_range_gain=0.04 | 0.651 | 0.800 | 0.585 | 7.4% | 20.4% | 0.506 | 6.5 | 0.682 | 0.662 | 1746 | 0.35 | – | 4.8% |
+| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Recall@1m >7m | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | Moving heading err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Structures / frame |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `accurate`: preset defaults | 0.697 | 0.849 | 0.628 | 0.510 | 9.4% | 8.6% | 0.508 | 5.7 | 14.4 | 0.710 | 0.676 | 1749 | 0.32 | – | 4.8% | 1.2 |
+| `accurate`: cluster_range_gain=0 | 0.691 | 0.848 | 0.618 | 0.510 | 9.9% | 8.3% | 0.500 | 5.7 | 15.2 | 0.706 | 0.664 | 1832 | 0.32 | – | 4.8% | 1.1 |
+| `accurate`: cluster_range_gain=0.04 | 0.675 | 0.817 | 0.633 | 0.614 | 5.0% | 13.2% | 0.526 | 5.6 | 12.7 | 0.716 | 0.697 | 1744 | 0.34 | – | 4.8% | 2.0 |
+| `accurate`: cluster_min_size=3 | 0.765 | 0.925 | 0.630 | 0.546 | 27.8% | 8.5% | 0.461 | 6.8 | 17.3 | 0.599 | 0.415 | 3104 | 0.37 | – | 4.8% | 1.2 |
+| `accurate`: cluster_min_size=5 | 0.741 | 0.902 | 0.631 | 0.529 | 18.9% | 8.5% | 0.478 | 6.3 | 15.7 | 0.662 | 0.571 | 2458 | 0.34 | – | 4.8% | 1.2 |
+| `accurate`: cluster_threshold=0.4 | 0.710 | 0.863 | 0.626 | 0.447 | 16.8% | 6.7% | 0.493 | 5.8 | 16.3 | 0.640 | 0.519 | 2165 | 0.34 | – | 4.8% | 0.4 |
+| `accurate`: cluster_threshold=0.8 | 0.690 | 0.847 | 0.632 | 0.521 | 6.6% | 9.8% | 0.506 | 5.8 | 13.2 | 0.694 | 0.643 | 1970 | 0.34 | – | 4.8% | 0.3 |
+| `accurate`: voxel_grid_size=0.1 | 0.711 | 0.868 | 0.646 | 0.518 | 11.6% | 8.7% | 0.505 | 6.1 | 14.3 | 0.699 | 0.655 | 1862 | 0.32 | – | 4.0% | 1.4 |
+| `fast`: preset defaults | 0.661 | 0.818 | 0.617 | 0.543 | 5.3% | 9.7% | 0.512 | 5.9 | 13.9 | 0.725 | 0.709 | 1725 | 0.35 | – | 4.8% | 1.9 |
+| `fast`: cluster_cell_size=0.15 | 0.660 | 0.814 | 0.617 | 0.523 | 4.7% | 10.2% | 0.514 | 5.9 | 13.2 | 0.725 | 0.714 | 1631 | 0.35 | – | 4.8% | 2.0 |
+| `fast`: cluster_cell_size=0.35 | 0.662 | 0.816 | 0.613 | 0.534 | 6.6% | 8.3% | 0.514 | 5.8 | 14.8 | 0.715 | 0.690 | 1869 | 0.34 | – | 4.8% | 2.2 |
+| `fast`: cluster_range_gain=0 | 0.660 | 0.819 | 0.613 | 0.540 | 5.6% | 9.4% | 0.510 | 5.9 | 14.0 | 0.725 | 0.707 | 1712 | 0.34 | – | 4.8% | 1.9 |
+| `fast`: cluster_range_gain=0.04 | 0.626 | 0.777 | 0.604 | 0.565 | 3.0% | 14.5% | 0.518 | 5.9 | 12.4 | 0.711 | 0.693 | 1805 | 0.36 | – | 4.8% | 2.7 |
+| `fast`: cluster_min_size=3 | 0.714 | 0.890 | 0.620 | 0.578 | 17.1% | 9.6% | 0.472 | 6.7 | 15.9 | 0.667 | 0.598 | 2767 | 0.38 | – | 4.8% | 1.9 |
+| `fast`: cluster_min_size=5 | 0.697 | 0.866 | 0.620 | 0.545 | 10.9% | 9.6% | 0.487 | 6.4 | 15.0 | 0.706 | 0.671 | 2238 | 0.36 | – | 4.8% | 1.9 |
+| `fast`: ground_refine_threshold=0.15 | 0.663 | 0.820 | 0.622 | 0.546 | 5.4% | 9.8% | 0.514 | 5.8 | 14.0 | 0.724 | 0.709 | 1735 | 0.34 | – | 4.1% | 2.0 |
+| `fast`: ground_refine_threshold=0.3 | 0.654 | 0.809 | 0.608 | 0.539 | 5.1% | 9.3% | 0.510 | 5.9 | 13.9 | 0.722 | 0.703 | 1690 | 0.34 | – | 6.8% | 1.9 |
+| `fast`: cluster_threshold=0.4 | 0.686 | 0.840 | 0.626 | 0.531 | 9.6% | 8.2% | 0.511 | 5.8 | 15.4 | 0.707 | 0.668 | 1946 | 0.34 | – | 4.8% | 1.6 |
+| `fast`: cluster_threshold=0.8 | 0.645 | 0.805 | 0.603 | 0.547 | 3.6% | 13.6% | 0.504 | 5.9 | 12.3 | 0.717 | 0.709 | 1939 | 0.37 | – | 4.8% | 1.6 |
+| `fast`: voxel_grid_size=0.1 | 0.670 | 0.831 | 0.628 | 0.528 | 6.6% | 10.0% | 0.508 | 6.3 | 14.6 | 0.721 | 0.705 | 1780 | 0.34 | – | 4.0% | 2.1 |
+| `fast`: cluster_min_size=5, cluster_range_gain=0.04 | 0.652 | 0.816 | 0.609 | 0.569 | 5.8% | 14.3% | 0.501 | 6.3 | 13.1 | 0.704 | 0.684 | 2166 | 0.38 | – | 4.8% | 2.6 |
+| `accurate`: cluster_min_size=5, cluster_range_gain=0.04 | 0.705 | 0.859 | 0.639 | 0.622 | 9.4% | 13.1% | 0.505 | 6.0 | 13.7 | 0.695 | 0.656 | 2139 | 0.35 | – | 4.8% | 2.0 |
 
 **Recommendations.** For sparse lidars (≤ 32 beams), `cluster_min_size: 5` and
-`cluster_range_gain: 0.04` give large recall gains (nuScenes recall@1m 0.36 → 0.48 with `fast`,
-0.38 → 0.53 with `accurate`). On the denser AV2 setup they cause more merging (under-seg 16 → 28 %),
-so keep the defaults there. `ground_refine_threshold` between 0.15 and 0.3 m makes little
+`cluster_range_gain: 0.04` give large recall gains on nuScenes (see the `sparse` rows). On the
+denser AV2 setup they cause more merging, so keep the defaults there. `ground_refine_threshold` between 0.15 and 0.3 m makes little
 difference.
 
 ## Reproduce
