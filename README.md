@@ -43,15 +43,6 @@ Data: <a href="https://www.argoverse.org/av2.html">Argoverse 2</a> (CC BY-NC-SA 
 The v1 code remains available at the [`v1-ros1-legacy`](../../tree/v1-ros1-legacy) tag; see the
 [changelog](CHANGELOG.md) for everything that changed, including the v1 bugs that were fixed.
 
-## v1 vs v2 on the same drive
-
-<p align="center">
-  <img src="media/v1_vs_v2.gif" alt="Bird's-eye comparison of v1 and v2 on the same Argoverse 2 drive" width="100%">
-</p>
-<p align="center"><sub>Same Argoverse 2 intersection, bird's-eye view. v1 issues a new track ID almost every frame,
-and its single ground plane fails around the vehicle; v2 keeps stable IDs (1 s trails) at a fifth of the runtime.
-Data: Argoverse 2 (CC BY-NC-SA 4.0).</sub></p>
-
 ## Pipeline
 
 ```mermaid
