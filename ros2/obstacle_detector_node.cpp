@@ -53,6 +53,31 @@ std::string toString(const rclcpp::Parameter &p) {
   }
 }
 
+#ifdef LOD_HAVE_AUTOWARE
+uint8_t autowareLabel(ObjectClass c) {
+  using L = autoware_perception_msgs::msg::ObjectClassification;
+  switch (c) {
+    case ObjectClass::kCar:
+      return L::CAR;
+    case ObjectClass::kTruck:
+    case ObjectClass::kConstructionVehicle:
+      return L::TRUCK;
+    case ObjectClass::kBus:
+      return L::BUS;
+    case ObjectClass::kTrailer:
+      return L::TRAILER;
+    case ObjectClass::kMotorcycle:
+      return L::MOTORCYCLE;
+    case ObjectClass::kBicycle:
+      return L::BICYCLE;
+    case ObjectClass::kPedestrian:
+      return L::PEDESTRIAN;
+    default:
+      return L::UNKNOWN;
+  }
+}
+#endif
+
 geometry_msgs::msg::Pose toPose(const Eigen::Vector3f &center, float yaw) {
   geometry_msgs::msg::Pose pose;
   pose.position.x = center.x();
@@ -164,7 +189,7 @@ class ObstacleDetectorNode : public rclcpp::Node {
         case ParamInfo::Type::kString: {
           std::string choices;
           for (const auto &c : p.choices) choices += (choices.empty() ? "" : ", ") + c;
-          d.additional_constraints = "one of: " + choices;
+          if (!choices.empty()) d.additional_constraints = "one of: " + choices;
           declared = rclcpp::Parameter(p.name, declare_parameter<std::string>(p.name, value, d));
           break;
         }
@@ -198,11 +223,17 @@ class ObstacleDetectorNode : public rclcpp::Node {
       result.reason = e.what();
       return result;
     }
+    try {
+      detector_->setConfig(config);  // may load a network, or fail if it is not built in
+    } catch (const std::exception &e) {
+      result.successful = false;
+      result.reason = e.what();
+      return result;
+    }
     if (tracking != tracking_frame_) detector_->reset();  // tracks live in that frame
     target_frame_ = target;
     tracking_frame_ = tracking;
     tf_timeout_ = timeout;
-    detector_->setConfig(config);
     return result;
   }
 
@@ -367,8 +398,8 @@ class ObstacleDetectorNode : public rclcpp::Node {
       det.bbox.size.y = b.size.y();
       det.bbox.size.z = b.size.z();
       vision_msgs::msg::ObjectHypothesisWithPose hyp;
-      hyp.hypothesis.class_id = "unknown";
-      hyp.hypothesis.score = 1.0;
+      hyp.hypothesis.class_id = objectClassName(b.label);
+      hyp.hypothesis.score = b.score;
       hyp.pose.pose = pose;
       det.results.push_back(hyp);
       detections.detections.push_back(det);
@@ -411,10 +442,10 @@ class ObstacleDetectorNode : public rclcpp::Node {
 
 #ifdef LOD_HAVE_AUTOWARE
       autoware_perception_msgs::msg::DetectedObject obj;
-      obj.existence_probability = 1.f;
+      obj.existence_probability = b.score;
       autoware_perception_msgs::msg::ObjectClassification cls;
-      cls.label = autoware_perception_msgs::msg::ObjectClassification::UNKNOWN;
-      cls.probability = 1.f;
+      cls.label = autowareLabel(b.label);
+      cls.probability = b.score;
       obj.classification.push_back(cls);
       obj.kinematics.pose_with_covariance.pose = pose;
       obj.kinematics.orientation_availability =

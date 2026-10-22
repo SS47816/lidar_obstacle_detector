@@ -15,6 +15,23 @@
 
 namespace lidar_obstacle_detector {
 
+// Object classes of the learned detectors; the clustering detector only
+// produces kUnknown (any obstacle)
+enum class ObjectClass : uint8_t {
+  kUnknown = 0,
+  kCar,
+  kTruck,
+  kBus,
+  kTrailer,
+  kConstructionVehicle,
+  kPedestrian,
+  kMotorcycle,
+  kBicycle,
+  kBarrier,
+  kTrafficCone,
+};
+const char *objectClassName(ObjectClass c);
+
 // An upright 3D bounding box (rotation about z only), as produced by the box
 // fitting stage and refined by the tracker.
 struct Box {
@@ -28,9 +45,11 @@ struct Box {
   bool has_velocity = false;  // velocity estimate is available
   Eigen::Vector2f velocity = Eigen::Vector2f::Zero();
   uint32_t age = 0;  // number of frames the track has been updated
-  // Yaw is the direction of travel (front/back resolved from the motion); when
-  // false, yaw is only known modulo 180 deg
+  // Yaw is the direction of travel (front/back resolved from the motion or by a
+  // learned detector); when false, yaw is only known modulo 180 deg
   bool heading_known = false;
+  ObjectClass label = ObjectClass::kUnknown;
+  float score = 1.f;  // detection confidence (1 for clustering)
 
   Box() = default;
   Box(uint32_t id, const Eigen::Vector3f &center, const Eigen::Vector3f &size, float yaw = 0.f)
@@ -45,6 +64,7 @@ struct Box {
 struct StageTimings {
   double preprocess = 0.0;
   double ground = 0.0;
+  double learned = 0.0;  // learned detector (GPU), if enabled
   double cluster = 0.0;
   double box = 0.0;
   double track = 0.0;

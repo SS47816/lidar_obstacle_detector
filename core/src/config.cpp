@@ -149,9 +149,31 @@ Entry choice(const std::string &name, const std::string &desc,
           }};
 }
 
+Entry text(const std::string &name, const std::string &desc,
+           std::function<std::string &(PipelineConfig &)> field) {
+  ParamInfo info{name, ParamInfo::Type::kString, desc, 0, 0, {}};
+  return {info, [field](const PipelineConfig &c) { return field(const_cast<PipelineConfig &>(c)); },
+          [field](PipelineConfig &c, const std::string &s) { field(c) = s; }};
+}
+
 const std::vector<Entry> &entries() {
   using C = PipelineConfig;
   static const std::vector<Entry> table = {
+      // --- detector ---
+      choice<DetectorMethod>(
+          "detector_method",
+          "Detector: clustering | centerpoint | hybrid (centerpoint and hybrid need "
+          "a TensorRT build)",
+          {{"clustering", DetectorMethod::kClustering},
+           {"centerpoint", DetectorMethod::kCenterPoint},
+           {"hybrid", DetectorMethod::kHybrid}},
+          [](C &c) -> DetectorMethod & { return c.detector.method; }),
+      real("detector_score_threshold", "Min score of learned detections", 0, 1,
+           [](C &c) -> float & { return c.detector.score_threshold; }),
+      text("detector_model_dir", "Directory of the learned detector models (\"\" = built-in)",
+           [](C &c) -> std::string & { return c.detector.model_dir; }),
+      text("detector_engine_cache", "Directory for TensorRT engine caches (\"\" = ~/.cache)",
+           [](C &c) -> std::string & { return c.detector.engine_cache; }),
       // --- preprocessing ---
       real("voxel_grid_size", "Voxel grid leaf size [m], 0 disables downsampling", 0, 1,
            [](C &c) -> float & { return c.preprocess.voxel_size; }),
@@ -182,10 +204,10 @@ const std::vector<Entry> &entries() {
       real("ego_max_z", "Ego box max z [m]", -10, 10,
            [](C &c) -> float & { return c.preprocess.ego_max.z(); }),
       // --- ground segmentation ---
-      choice<GroundMethod>(
-          "ground_method", "Ground segmentation: ransac | patchworkpp",
-          {{"ransac", GroundMethod::kRansac}, {"patchworkpp", GroundMethod::kPatchworkpp}},
-          [](C &c) -> GroundMethod & { return c.ground.method; }),
+      choice<GroundMethod>("ground_method", "Ground segmentation: ransac | patchworkpp",
+                           {{"ransac", GroundMethod::kRansac},
+                            {"patchworkpp", GroundMethod::kPatchworkpp}},
+                           [](C &c) -> GroundMethod & { return c.ground.method; }),
       real("ground_threshold", "RANSAC plane distance threshold [m]", 0, 2,
            [](C &c) -> float & { return c.ground.distance_threshold; }),
       integer("ground_max_iterations", "RANSAC iterations", 1, 10000,

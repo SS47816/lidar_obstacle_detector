@@ -93,7 +93,32 @@ pkg-config = "*"
 workspace = "mkdir -p build/noetic_ws/src && ln -sfn $PIXI_PROJECT_ROOT build/noetic_ws/src/lidar_obstacle_detector && cd build/noetic_ws && (test -d .catkin_tools || catkin init)"
 build = { cmd = "cd build/noetic_ws && catkin build --no-status -DCMAKE_BUILD_TYPE=Release", depends-on = ["workspace"] }
 
+# --------------------------------------------------------------------------
+# gpu: CUDA + TensorRT for the optional learned detectors (LOD_WITH_TENSORRT)
+# CUDA 12.8 matches NVIDIA drivers >= 570; TensorRT 10 is the matching series
+# --------------------------------------------------------------------------
+[feature.gpu]
+
+[feature.gpu.dependencies]
+cuda-version = "12.8.*"
+cuda-nvcc = "*"
+cuda-cudart-dev = "*"
+libprotobuf = "*"
+
+# conda-forge only builds TensorRT for CUDA 13 (driver >= 580); for CUDA 12
+# drivers we take NVIDIA's TensorRT 10 libraries from PyPI and the matching
+# public headers from the TensorRT OSS repository (task `trt-headers`).
+[feature.gpu.pypi-dependencies]
+tensorrt-cu12-libs = "==10.16.1.11"
+
+[feature.gpu.tasks]
+gpu-configure = { cmd = "cmake -S . -B build/gpu -G Ninja -DCMAKE_BUILD_TYPE=Release -DLOD_BUILD_TESTS=ON -DLOD_BUILD_TOOLS=ON -DLOD_WITH_TENSORRT=ON", depends-on = ["trt-headers"] }
+gpu-build = { cmd = "cmake --build build/gpu", depends-on = ["gpu-configure"] }
+gpu-test = { cmd = "ctest --test-dir build/gpu --output-on-failure", depends-on = ["gpu-build"] }
+trt-headers = { cmd = "test -f $CONDA_PREFIX/include/tensorrt/NvInfer.h || (git clone -q --depth 1 --branch v10.16 --filter=blob:none --sparse https://github.com/NVIDIA/TensorRT.git $CONDA_PREFIX/share/tensorrt-oss && git -C $CONDA_PREFIX/share/tensorrt-oss sparse-checkout set include && mkdir -p $CONDA_PREFIX/include/tensorrt && cp $CONDA_PREFIX/share/tensorrt-oss/include/*.h $CONDA_PREFIX/include/tensorrt/)" }
+
 [environments]
 core = { features = ["core"], solve-group = "core" }
+gpu = { features = ["core", "gpu"] }
 jazzy = { features = ["jazzy"], no-default-feature = true }
 noetic = { features = ["noetic"], no-default-feature = true }

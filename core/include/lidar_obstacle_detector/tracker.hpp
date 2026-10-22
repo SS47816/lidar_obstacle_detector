@@ -50,6 +50,7 @@ class MultiObjectTracker {
     double last_update;
     float motion_heading;  // last velocity heading, for the consistency check
     int heading_streak;    // consecutive frames with a consistent velocity heading
+    ObjectClass label;     // last class reported by a learned detector
   };
 
   void predict(Track *t, float dt) const;

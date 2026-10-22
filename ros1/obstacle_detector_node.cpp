@@ -142,11 +142,11 @@ class ObstacleDetectorNode {
         desc->getValue(c, value);
         setParameter(&config, desc->name, anyToString(value));
       }
+      detector_->setConfig(config);  // may load a network, or fail if it is not built in
     } catch (const std::exception &e) {
       ROS_ERROR("Rejected parameter update: %s", e.what());
       return;
     }
-    detector_->setConfig(config);
   }
 
   bool lookup(const std::string &target, const std::string &source, const ros::Time &stamp,
@@ -283,7 +283,7 @@ class ObstacleDetectorNode {
       jb.dimensions.x = b.size.x();
       jb.dimensions.y = b.size.y();
       jb.dimensions.z = b.size.z();
-      jb.value = 1.f;
+      jb.value = b.score;
       jb.label = b.id;
       jsk.boxes.push_back(jb);
 
@@ -316,8 +316,8 @@ class ObstacleDetectorNode {
       autoware_msgs::DetectedObject obj;
       obj.header = header;
       obj.id = b.id;
-      obj.label = "unknown";
-      obj.score = 1.f;
+      obj.label = objectClassName(b.label);
+      obj.score = b.score;
       obj.valid = true;
       obj.pose = pose;
       obj.pose_reliable = b.tracked;
