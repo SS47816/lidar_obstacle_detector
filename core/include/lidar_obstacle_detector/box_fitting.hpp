@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "lidar_obstacle_detector/config.hpp"
+#include "lidar_obstacle_detector/pcl_compat.hpp"
 #include "lidar_obstacle_detector/types.hpp"
 
 namespace lidar_obstacle_detector {

@@ -91,10 +91,18 @@ class ObstacleDetectorNode {
       if (private_nh_.hasParam(p.name)) continue;
       const std::string v = getParameter(config, p.name);
       switch (p.type) {
-        case ParamInfo::Type::kBool: private_nh_.setParam(p.name, v == "true"); break;
-        case ParamInfo::Type::kInt: private_nh_.setParam(p.name, std::stoi(v)); break;
-        case ParamInfo::Type::kDouble: private_nh_.setParam(p.name, std::stod(v)); break;
-        case ParamInfo::Type::kString: private_nh_.setParam(p.name, v); break;
+        case ParamInfo::Type::kBool:
+          private_nh_.setParam(p.name, v == "true");
+          break;
+        case ParamInfo::Type::kInt:
+          private_nh_.setParam(p.name, std::stoi(v));
+          break;
+        case ParamInfo::Type::kDouble:
+          private_nh_.setParam(p.name, std::stod(v));
+          break;
+        case ParamInfo::Type::kString:
+          private_nh_.setParam(p.name, v);
+          break;
       }
     }
     detector_ = std::make_unique<ObstacleDetector<PointT>>(config);

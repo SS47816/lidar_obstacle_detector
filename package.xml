@@ -8,7 +8,7 @@
     clustering (Euclidean / adaptive / BEV grid), L-shape bounding boxes and Kalman-filter
     multi-object tracking. ROS-agnostic core with ROS 1 (Noetic) and ROS 2 (Humble, Jazzy) nodes.
   </description>
-  <maintainer email="ss1057532022@gmail.com">Shuo Sun</maintainer>
+  <maintainer email="shuo.sun@u.nus.edu">Shuo Sun</maintainer>
   <license>MIT</license>
   <license file="third_party/patchworkpp/LICENSE">BSD-2-Clause</license>
   <url type="website">https://github.com/SS47816/lidar_obstacle_detector</url>

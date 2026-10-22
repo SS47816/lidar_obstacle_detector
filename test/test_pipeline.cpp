@@ -104,3 +104,23 @@ TEST(Pipeline, ConfigChangesApplyBetweenFrames) {
   detector.setConfig(cfg);
   EXPECT_TRUE(detector.process(syntheticScene(10.f, &rng), 0.0).boxes.empty());
 }
+
+TEST(Preprocess, VoxelDownsampleAveragesEachVoxel) {
+  pcl::PointCloud<pcl::PointXYZI> cloud;
+  auto add = [&](float x, float y, float z, float i) {
+    pcl::PointXYZI p;
+    p.x = x, p.y = y, p.z = z, p.intensity = i;
+    cloud.push_back(p);
+  };
+  add(0.01f, 0.01f, 0.01f, 1.f);
+  add(0.09f, 0.05f, 0.03f, 3.f);   // same 0.1 m voxel
+  add(-0.05f, 0.05f, 0.05f, 5.f);  // negative side: another voxel
+  add(0.55f, 0.55f, 0.55f, 7.f);
+  const auto out = voxelDownsample(cloud, 0.1f, Eigen::Vector3f(-1.f, -1.f, -1.f));
+  ASSERT_EQ(out->size(), 3u);
+  EXPECT_NEAR(out->points[0].x, 0.05f, 1e-6);
+  EXPECT_NEAR(out->points[0].y, 0.03f, 1e-6);
+  EXPECT_NEAR(out->points[0].intensity, 2.f, 1e-6);
+  EXPECT_NEAR(out->points[1].x, -0.05f, 1e-6);
+  EXPECT_NEAR(out->points[2].intensity, 7.f, 1e-6);
+}

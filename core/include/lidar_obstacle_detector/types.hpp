@@ -30,8 +30,7 @@ struct Box {
   uint32_t age = 0;  // number of frames the track has been updated
 
   Box() = default;
-  Box(uint32_t id, const Eigen::Vector3f &center, const Eigen::Vector3f &size,
-      float yaw = 0.f)
+  Box(uint32_t id, const Eigen::Vector3f &center, const Eigen::Vector3f &size, float yaw = 0.f)
       : id(id), center(center), size(size), yaw(yaw) {}
 
   Eigen::Quaternionf orientation() const {

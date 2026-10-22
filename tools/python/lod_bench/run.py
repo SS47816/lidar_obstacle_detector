@@ -38,9 +38,19 @@ def main():
 
     def run(seq):
         cmd = [
-            args.bin, "--seq", seq, "--out", os.path.join(run_dir, os.path.basename(seq)),
-            "--pipeline", args.pipeline, "--preset", args.preset, "--config", args.cfg,
-            "--dump-every", str(args.dump_every),
+            args.bin,
+            "--seq",
+            seq,
+            "--out",
+            os.path.join(run_dir, os.path.basename(seq)),
+            "--pipeline",
+            args.pipeline,
+            "--preset",
+            args.preset,
+            "--config",
+            args.cfg,
+            "--dump-every",
+            str(args.dump_every),
         ]
         for kv in args.set:
             cmd += ["--set", kv]
@@ -51,8 +61,19 @@ def main():
             if r.returncode != 0:
                 sys.exit(f"{seq} failed:\n{r.stderr}")
     subprocess.run(
-        [sys.executable, "-I", os.path.join(HERE, "evaluate.py"), "--data", data,
-         "--results", run_dir, "--cfg", args.cfg, "--out", os.path.join(run_dir, "metrics.json")],
+        [
+            sys.executable,
+            "-I",
+            os.path.join(HERE, "evaluate.py"),
+            "--data",
+            data,
+            "--results",
+            run_dir,
+            "--cfg",
+            args.cfg,
+            "--out",
+            os.path.join(run_dir, "metrics.json"),
+        ],
         check=True,
     )
 

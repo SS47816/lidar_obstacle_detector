@@ -30,16 +30,15 @@ using json = nlohmann::json;
 namespace {
 
 void usage() {
-  std::cerr
-      << "Usage: lod_benchmark --seq DIR --out DIR [options]\n"
-         "  --pipeline legacy|v2   pipeline to run (default v2)\n"
-         "  --preset NAME          v2 preset: legacy|fast|accurate (default "
-         "fast)\n"
-         "  --config FILE          key=value parameter file (# comments)\n"
-         "  --set key=value        parameter override (repeatable)\n"
-         "  --dump-every N         dump processed clouds every N-th annotated "
-         "frame (0=off)\n"
-         "  --max-frames N         stop after N frames\n";
+  std::cerr << "Usage: lod_benchmark --seq DIR --out DIR [options]\n"
+               "  --pipeline legacy|v2   pipeline to run (default v2)\n"
+               "  --preset NAME          v2 preset: legacy|fast|accurate (default "
+               "fast)\n"
+               "  --config FILE          key=value parameter file (# comments)\n"
+               "  --set key=value        parameter override (repeatable)\n"
+               "  --dump-every N         dump processed clouds every N-th annotated "
+               "frame (0=off)\n"
+               "  --max-frames N         stop after N frames\n";
 }
 
 void parseKeyValue(const std::string &kv, lod::ParamMap *params) {
@@ -108,16 +107,27 @@ int main(int argc, char **argv) {
         if (i + 1 >= argc) throw std::invalid_argument("missing value for " + a);
         return argv[++i];
       };
-      if (a == "--seq") seq_dir = next();
-      else if (a == "--out") out_dir = next();
-      else if (a == "--pipeline") pipeline = next();
-      else if (a == "--preset") preset = next();
-      else if (a == "--config") readConfigFile(next(), &params);
-      else if (a == "--set") parseKeyValue(next(), &params);
-      else if (a == "--dump-every") dump_every = std::stoi(next());
-      else if (a == "--max-frames") max_frames = std::stol(next());
-      else if (a == "-h" || a == "--help") { usage(); return 0; }
-      else throw std::invalid_argument("unknown argument " + a);
+      if (a == "--seq")
+        seq_dir = next();
+      else if (a == "--out")
+        out_dir = next();
+      else if (a == "--pipeline")
+        pipeline = next();
+      else if (a == "--preset")
+        preset = next();
+      else if (a == "--config")
+        readConfigFile(next(), &params);
+      else if (a == "--set")
+        parseKeyValue(next(), &params);
+      else if (a == "--dump-every")
+        dump_every = std::stoi(next());
+      else if (a == "--max-frames")
+        max_frames = std::stol(next());
+      else if (a == "-h" || a == "--help") {
+        usage();
+        return 0;
+      } else
+        throw std::invalid_argument("unknown argument " + a);
     }
     if (seq_dir.empty() || out_dir.empty()) {
       usage();

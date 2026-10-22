@@ -19,8 +19,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import SequenceWriter, box_record, make_tf, quat_to_rot, yaw_of  # noqa: E402
 
 VEHICLE = {
-    "REGULAR_VEHICLE", "LARGE_VEHICLE", "BUS", "BOX_TRUCK", "TRUCK", "TRUCK_CAB",
-    "VEHICULAR_TRAILER", "SCHOOL_BUS", "ARTICULATED_BUS", "RAILED_VEHICLE",
+    "REGULAR_VEHICLE",
+    "LARGE_VEHICLE",
+    "BUS",
+    "BOX_TRUCK",
+    "TRUCK",
+    "TRUCK_CAB",
+    "VEHICULAR_TRAILER",
+    "SCHOOL_BUS",
+    "ARTICULATED_BUS",
+    "RAILED_VEHICLE",
 }
 PEDESTRIAN = {"PEDESTRIAN", "WHEELCHAIR", "STROLLER", "OFFICIAL_SIGNALER"}
 # Ridden bicycles are covered by the BICYCLIST cuboid; the separate BICYCLE box -> "other".
@@ -72,7 +80,9 @@ def main():
 
         pose_df = pd.read_feather(os.path.join(log_dir, "city_SE3_egovehicle.feather"))
         poses = {
-            int(r.timestamp_ns): make_tf(quat_to_rot(r.qw, r.qx, r.qy, r.qz), [r.tx_m, r.ty_m, r.tz_m])
+            int(r.timestamp_ns): make_tf(
+                quat_to_rot(r.qw, r.qx, r.qy, r.qz), [r.tx_m, r.ty_m, r.tz_m]
+            )
             for r in pose_df.itertuples()
         }
         ann = pd.read_feather(os.path.join(log_dir, "annotations.feather")).reset_index(drop=True)

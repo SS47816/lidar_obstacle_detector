@@ -67,8 +67,8 @@ double parseNumber(const ParamInfo &info, const std::string &s) {
   if (pos == 0 || pos != s.size())
     throw std::invalid_argument(info.name + ": not a number: '" + s + "'");
   if (v < info.min || v > info.max)
-    throw std::invalid_argument(info.name + ": " + s + " out of range [" +
-                                toString(info.min) + ", " + toString(info.max) + "]");
+    throw std::invalid_argument(info.name + ": " + s + " out of range [" + toString(info.min) +
+                                ", " + toString(info.max) + "]");
   if (info.type == ParamInfo::Type::kInt && v != static_cast<int>(v))
     throw std::invalid_argument(info.name + ": not an integer: '" + s + "'");
   return v;
@@ -81,8 +81,8 @@ bool parseBool(const ParamInfo &info, const std::string &s) {
 }
 
 template <typename T>
-Entry number(const std::string &name, ParamInfo::Type type, const std::string &desc,
-             double min, double max, std::function<T &(PipelineConfig &)> field) {
+Entry number(const std::string &name, ParamInfo::Type type, const std::string &desc, double min,
+             double max, std::function<T &(PipelineConfig &)> field) {
   ParamInfo info{name, type, desc, min, max, {}};
   return {info,
           [field](const PipelineConfig &c) {
@@ -106,13 +106,12 @@ Entry integer(const std::string &name, const std::string &desc, int min, int max
 Entry boolean(const std::string &name, const std::string &desc,
               std::function<bool &(PipelineConfig &)> field) {
   ParamInfo info{name, ParamInfo::Type::kBool, desc, 0, 1, {}};
-  return {info,
-          [field](const PipelineConfig &c) {
-            return std::string(field(const_cast<PipelineConfig &>(c)) ? "true" : "false");
-          },
-          [info, field](PipelineConfig &c, const std::string &s) {
-            field(c) = parseBool(info, s);
-          }};
+  return {
+      info,
+      [field](const PipelineConfig &c) {
+        return std::string(field(const_cast<PipelineConfig &>(c)) ? "true" : "false");
+      },
+      [info, field](PipelineConfig &c, const std::string &s) { field(c) = parseBool(info, s); }};
 }
 
 template <typename E>
@@ -147,36 +146,49 @@ const std::vector<Entry> &entries() {
       // --- preprocessing ---
       real("voxel_grid_size", "Voxel grid leaf size [m], 0 disables downsampling", 0, 1,
            [](C &c) -> float & { return c.preprocess.voxel_size; }),
-      real("roi_min_x", "ROI min x [m]", -200, 0, [](C &c) -> float & { return c.preprocess.roi_min.x(); }),
-      real("roi_min_y", "ROI min y [m]", -200, 0, [](C &c) -> float & { return c.preprocess.roi_min.y(); }),
-      real("roi_min_z", "ROI min z [m]", -10, 0, [](C &c) -> float & { return c.preprocess.roi_min.z(); }),
-      real("roi_max_x", "ROI max x [m]", 0, 200, [](C &c) -> float & { return c.preprocess.roi_max.x(); }),
-      real("roi_max_y", "ROI max y [m]", 0, 200, [](C &c) -> float & { return c.preprocess.roi_max.y(); }),
-      real("roi_max_z", "ROI max z [m]", -5, 10, [](C &c) -> float & { return c.preprocess.roi_max.z(); }),
+      real("roi_min_x", "ROI min x [m]", -200, 0,
+           [](C &c) -> float & { return c.preprocess.roi_min.x(); }),
+      real("roi_min_y", "ROI min y [m]", -200, 0,
+           [](C &c) -> float & { return c.preprocess.roi_min.y(); }),
+      real("roi_min_z", "ROI min z [m]", -10, 0,
+           [](C &c) -> float & { return c.preprocess.roi_min.z(); }),
+      real("roi_max_x", "ROI max x [m]", 0, 200,
+           [](C &c) -> float & { return c.preprocess.roi_max.x(); }),
+      real("roi_max_y", "ROI max y [m]", 0, 200,
+           [](C &c) -> float & { return c.preprocess.roi_max.y(); }),
+      real("roi_max_z", "ROI max z [m]", -5, 10,
+           [](C &c) -> float & { return c.preprocess.roi_max.z(); }),
       boolean("remove_ego", "Remove points inside the ego-vehicle box",
               [](C &c) -> bool & { return c.preprocess.remove_ego; }),
-      real("ego_min_x", "Ego box min x [m]", -20, 20, [](C &c) -> float & { return c.preprocess.ego_min.x(); }),
-      real("ego_min_y", "Ego box min y [m]", -20, 20, [](C &c) -> float & { return c.preprocess.ego_min.y(); }),
-      real("ego_min_z", "Ego box min z [m]", -10, 10, [](C &c) -> float & { return c.preprocess.ego_min.z(); }),
-      real("ego_max_x", "Ego box max x [m]", -20, 20, [](C &c) -> float & { return c.preprocess.ego_max.x(); }),
-      real("ego_max_y", "Ego box max y [m]", -20, 20, [](C &c) -> float & { return c.preprocess.ego_max.y(); }),
-      real("ego_max_z", "Ego box max z [m]", -10, 10, [](C &c) -> float & { return c.preprocess.ego_max.z(); }),
+      real("ego_min_x", "Ego box min x [m]", -20, 20,
+           [](C &c) -> float & { return c.preprocess.ego_min.x(); }),
+      real("ego_min_y", "Ego box min y [m]", -20, 20,
+           [](C &c) -> float & { return c.preprocess.ego_min.y(); }),
+      real("ego_min_z", "Ego box min z [m]", -10, 10,
+           [](C &c) -> float & { return c.preprocess.ego_min.z(); }),
+      real("ego_max_x", "Ego box max x [m]", -20, 20,
+           [](C &c) -> float & { return c.preprocess.ego_max.x(); }),
+      real("ego_max_y", "Ego box max y [m]", -20, 20,
+           [](C &c) -> float & { return c.preprocess.ego_max.y(); }),
+      real("ego_max_z", "Ego box max z [m]", -10, 10,
+           [](C &c) -> float & { return c.preprocess.ego_max.z(); }),
       // --- ground segmentation ---
-      choice<GroundMethod>("ground_method", "Ground segmentation: ransac | patchworkpp",
-                           {{"ransac", GroundMethod::kRansac}, {"patchworkpp", GroundMethod::kPatchworkpp}},
-                           [](C &c) -> GroundMethod & { return c.ground.method; }),
+      choice<GroundMethod>(
+          "ground_method", "Ground segmentation: ransac | patchworkpp",
+          {{"ransac", GroundMethod::kRansac}, {"patchworkpp", GroundMethod::kPatchworkpp}},
+          [](C &c) -> GroundMethod & { return c.ground.method; }),
       real("ground_threshold", "RANSAC plane distance threshold [m]", 0, 2,
            [](C &c) -> float & { return c.ground.distance_threshold; }),
       integer("ground_max_iterations", "RANSAC iterations", 1, 10000,
               [](C &c) -> int & { return c.ground.max_iterations; }),
-      real("ground_max_slope", "RANSAC: max tilt of the ground plane [deg], 90 = unconstrained", 0, 90,
-           [](C &c) -> float & { return c.ground.max_slope_deg; }),
+      real("ground_max_slope", "RANSAC: max tilt of the ground plane [deg], 90 = unconstrained", 0,
+           90, [](C &c) -> float & { return c.ground.max_slope_deg; }),
       real("sensor_height", "Patchwork++: lidar height above the ground [m]", 0, 10,
            [](C &c) -> float & { return c.ground.sensor_height; }),
       boolean("ground_refine", "Relabel points close to the local ground height as ground",
               [](C &c) -> bool & { return c.ground.refine; }),
-      real("ground_refine_threshold", "Height above the local ground still counted as ground [m]", 0, 1,
-           [](C &c) -> float & { return c.ground.refine_threshold; }),
+      real("ground_refine_threshold", "Height above the local ground still counted as ground [m]",
+           0, 1, [](C &c) -> float & { return c.ground.refine_threshold; }),
       // --- clustering ---
       choice<ClusterMethod>("cluster_method", "Clustering: euclidean | adaptive | bev_grid",
                             {{"euclidean", ClusterMethod::kEuclidean},
@@ -185,8 +197,8 @@ const std::vector<Entry> &entries() {
                             [](C &c) -> ClusterMethod & { return c.cluster.method; }),
       real("cluster_threshold", "Cluster distance tolerance [m] (minimum when adaptive)", 0.05, 5,
            [](C &c) -> float & { return c.cluster.tolerance; }),
-      real("cluster_range_gain", "Adaptive tolerance = max(cluster_threshold, gain * range)", 0, 0.2,
-           [](C &c) -> float & { return c.cluster.range_gain; }),
+      real("cluster_range_gain", "Adaptive tolerance = max(cluster_threshold, gain * range)", 0,
+           0.2, [](C &c) -> float & { return c.cluster.range_gain; }),
       real("cluster_cell_size", "BEV grid cell size [m]", 0.05, 2,
            [](C &c) -> float & { return c.cluster.cell_size; }),
       integer("cluster_min_size", "Min points per cluster", 1, 100000,
@@ -194,9 +206,11 @@ const std::vector<Entry> &entries() {
       integer("cluster_max_size", "Max points per cluster", 1, 10000000,
               [](C &c) -> int & { return c.cluster.max_size; }),
       // --- bounding boxes ---
-      choice<BoxMethod>("box_method", "Box fitting: aabb | pca | lshape",
-                        {{"aabb", BoxMethod::kAabb}, {"pca", BoxMethod::kPca}, {"lshape", BoxMethod::kLShape}},
-                        [](C &c) -> BoxMethod & { return c.box.method; }),
+      choice<BoxMethod>(
+          "box_method",
+          "Box fitting: aabb | pca | lshape",
+          {{"aabb", BoxMethod::kAabb}, {"pca", BoxMethod::kPca}, {"lshape", BoxMethod::kLShape}},
+          [](C &c) -> BoxMethod & { return c.box.method; }),
       real("lshape_angle_step", "L-shape search step [deg]", 0.1, 10,
            [](C &c) -> float & { return c.box.lshape_angle_step_deg; }),
       // --- tracking ---
@@ -225,8 +239,8 @@ const std::vector<Entry> &entries() {
 
 const Entry &find(const std::string &name) {
   const auto &table = entries();
-  const auto it = std::find_if(table.begin(), table.end(),
-                               [&](const Entry &e) { return e.info.name == name; });
+  const auto it =
+      std::find_if(table.begin(), table.end(), [&](const Entry &e) { return e.info.name == name; });
   if (it == table.end()) throw std::invalid_argument("unknown parameter '" + name + "'");
   return *it;
 }

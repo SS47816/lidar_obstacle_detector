@@ -26,6 +26,8 @@ scipy = "*"
 matplotlib = "*"
 s5cmd = "*"
 nlohmann_json = "*"
+clang-format = "19.*"
+pre-commit = "*"
 
 [feature.core.pypi-dependencies]
 motmetrics = "*"

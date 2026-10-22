@@ -54,9 +54,9 @@ class ObstacleDetector {
   void setConfig(const PipelineConfig &config) {
     const auto &g = config.ground;
     const auto &o = config_.ground;
-    if (!ground_segmenter_ || g.method != o.method || g.distance_threshold != o.distance_threshold ||
-        g.max_iterations != o.max_iterations || g.max_slope_deg != o.max_slope_deg ||
-        g.sensor_height != o.sensor_height)
+    if (!ground_segmenter_ || g.method != o.method ||
+        g.distance_threshold != o.distance_threshold || g.max_iterations != o.max_iterations ||
+        g.max_slope_deg != o.max_slope_deg || g.sensor_height != o.sensor_height)
       ground_segmenter_ = makeGroundSegmenter<PointT>(g);
     config_ = config;
     tracker_.setConfig(config.tracker);

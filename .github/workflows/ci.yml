@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jidicula/clang-format-action@v4.15.0
+        with:
+          clang-format-version: "19"
+          exclude-regex: "(third_party|legacy)/"
+
+  core:
+    name: core (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: release
+            flags: -DCMAKE_BUILD_TYPE=Release
+          - name: asan-ubsan
+            flags: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLOD_SANITIZE=ON -DLOD_WITH_OPENMP=OFF
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build libpcl-dev libeigen3-dev libgtest-dev nlohmann-json3-dev
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja ${{ matrix.flags }} -DLOD_BUILD_TESTS=ON -DLOD_BUILD_TOOLS=ON
+          cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  ros:
+    name: ROS ${{ matrix.env.ROS_DISTRO }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+          - { ROS_DISTRO: noetic, ROS_REPO: main }
+          - { ROS_DISTRO: humble, ROS_REPO: main }
+          - { ROS_DISTRO: jazzy, ROS_REPO: main }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ros-industrial/industrial_ci@master
+        env: ${{ matrix.env }}
+
+  pixi:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.10
+        with:
+          environments: core
+      - run: pixi run -e core test

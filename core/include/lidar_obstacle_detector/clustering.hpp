@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "lidar_obstacle_detector/config.hpp"
+#include "lidar_obstacle_detector/pcl_compat.hpp"
 
 namespace lidar_obstacle_detector {
 
@@ -95,8 +96,7 @@ std::vector<pcl::Indices> adaptiveEuclideanClustering(
     visited[seed] = true;
     for (size_t k = 0; k < cluster.size(); ++k) {
       const auto &p = cloud->points[cluster[k]];
-      const float radius =
-          std::max(cfg.tolerance, cfg.range_gain * std::hypot(p.x, p.y));
+      const float radius = std::max(cfg.tolerance, cfg.range_gain * std::hypot(p.x, p.y));
       tree.radiusSearch(p, radius, neighbours, sq_dists);
       for (const auto n : neighbours) {
         if (!visited[n]) {
@@ -116,8 +116,8 @@ std::vector<pcl::Indices> adaptiveEuclideanClustering(
 // cells (more at long range when range_gain > 0). Runs in O(n) and is much
 // faster than KD-tree based clustering on dense scans.
 template <typename PointT>
-std::vector<pcl::Indices> bevGridClustering(
-    const typename pcl::PointCloud<PointT>::ConstPtr &cloud, const ClusterConfig &cfg) {
+std::vector<pcl::Indices> bevGridClustering(const typename pcl::PointCloud<PointT>::ConstPtr &cloud,
+                                            const ClusterConfig &cfg) {
   std::vector<pcl::Indices> clusters;
   if (cloud->empty()) return clusters;
   const float cell = cfg.cell_size;
@@ -142,8 +142,8 @@ std::vector<pcl::Indices> bevGridClustering(
   std::vector<int> occupied;                                   // occupied idx -> grid
   for (size_t i = 0; i < cloud->size(); ++i) {
     const auto &p = cloud->points[i];
-    const int g = static_cast<int>((p.x - min_x) / cell) * ny +
-                  static_cast<int>((p.y - min_y) / cell);
+    const int g =
+        static_cast<int>((p.x - min_x) / cell) * ny + static_cast<int>((p.y - min_y) / cell);
     if (cell_of[g] < 0) {
       cell_of[g] = static_cast<int>(occupied.size());
       occupied.push_back(g);

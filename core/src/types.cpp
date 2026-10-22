@@ -17,8 +17,7 @@ namespace {
 
 using Polygon = std::vector<Eigen::Vector2f>;
 
-float cross(const Eigen::Vector2f &o, const Eigen::Vector2f &a,
-            const Eigen::Vector2f &b) {
+float cross(const Eigen::Vector2f &o, const Eigen::Vector2f &a, const Eigen::Vector2f &b) {
   return (a.x() - o.x()) * (b.y() - o.y()) - (a.y() - o.y()) * (b.x() - o.x());
 }
 

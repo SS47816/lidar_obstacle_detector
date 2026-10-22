@@ -68,12 +68,24 @@ std_msgs::msg::ColorRGBA idColor(uint32_t id, float alpha) {
   const float x = 1.f - std::abs(std::fmod(h, 2.f) - 1.f);
   float r = 0, g = 0, b = 0;
   switch (static_cast<int>(h)) {
-    case 0: r = 1, g = x; break;
-    case 1: r = x, g = 1; break;
-    case 2: g = 1, b = x; break;
-    case 3: g = x, b = 1; break;
-    case 4: r = x, b = 1; break;
-    default: r = 1, b = x; break;
+    case 0:
+      r = 1, g = x;
+      break;
+    case 1:
+      r = x, g = 1;
+      break;
+    case 2:
+      g = 1, b = x;
+      break;
+    case 3:
+      g = x, b = 1;
+      break;
+    case 4:
+      r = x, b = 1;
+      break;
+    default:
+      r = 1, b = x;
+      break;
   }
   std_msgs::msg::ColorRGBA c;
   c.r = r, c.g = g, c.b = b, c.a = alpha;
@@ -85,9 +97,7 @@ std_msgs::msg::ColorRGBA idColor(uint32_t id, float alpha) {
 class ObstacleDetectorNode : public rclcpp::Node {
  public:
   explicit ObstacleDetectorNode(const rclcpp::NodeOptions &options)
-      : Node("obstacle_detector", options),
-        tf_buffer_(get_clock()),
-        tf_listener_(tf_buffer_) {
+      : Node("obstacle_detector", options), tf_buffer_(get_clock()), tf_listener_(tf_buffer_) {
     rcl_interfaces::msg::ParameterDescriptor read_only;
     read_only.read_only = true;
     read_only.description = "Base preset (legacy | fast | accurate); other parameters override it";
@@ -135,8 +145,8 @@ class ObstacleDetectorNode : public rclcpp::Node {
           r.to_value = static_cast<int64_t>(p.max);
           r.step = 1;
           d.integer_range.push_back(r);
-          declared = rclcpp::Parameter(
-              p.name, declare_parameter<int64_t>(p.name, std::stoll(value), d));
+          declared =
+              rclcpp::Parameter(p.name, declare_parameter<int64_t>(p.name, std::stoll(value), d));
           break;
         }
         case ParamInfo::Type::kDouble: {
@@ -152,8 +162,7 @@ class ObstacleDetectorNode : public rclcpp::Node {
           std::string choices;
           for (const auto &c : p.choices) choices += (choices.empty() ? "" : ", ") + c;
           d.additional_constraints = "one of: " + choices;
-          declared = rclcpp::Parameter(
-              p.name, declare_parameter<std::string>(p.name, value, d));
+          declared = rclcpp::Parameter(p.name, declare_parameter<std::string>(p.name, value, d));
           break;
         }
       }
@@ -172,10 +181,14 @@ class ObstacleDetectorNode : public rclcpp::Node {
     double timeout = tf_timeout_;
     try {
       for (const auto &p : params) {
-        if (p.get_name() == "target_frame") target = p.as_string();
-        else if (p.get_name() == "tracking_frame") tracking = p.as_string();
-        else if (p.get_name() == "tf_timeout") timeout = p.as_double();
-        else setParameter(&config, p.get_name(), toString(p));
+        if (p.get_name() == "target_frame")
+          target = p.as_string();
+        else if (p.get_name() == "tracking_frame")
+          tracking = p.as_string();
+        else if (p.get_name() == "tf_timeout")
+          timeout = p.as_double();
+        else
+          setParameter(&config, p.get_name(), toString(p));
       }
     } catch (const std::exception &e) {
       result.successful = false;
@@ -208,7 +221,8 @@ class ObstacleDetectorNode : public rclcpp::Node {
         *tf = tf2::transformToEigen(msg).cast<float>();
         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
                              "TF %s <- %s not available at the cloud stamp, using the latest "
-                             "one (%s)", target.c_str(), source.c_str(), e.what());
+                             "one (%s)",
+                             target.c_str(), source.c_str(), e.what());
         return true;
       } catch (const tf2::TransformException &e2) {
         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "TF %s <- %s unavailable: %s",
@@ -254,8 +268,8 @@ class ObstacleDetectorNode : public rclcpp::Node {
     RCLCPP_DEBUG(get_logger(),
                  "%zu obstacles in %.1f ms (pre %.1f, ground %.1f, cluster %.1f, box %.1f, "
                  "track %.1f)",
-                 res.boxes.size(), res.timings.total, res.timings.preprocess,
-                 res.timings.ground, res.timings.cluster, res.timings.box, res.timings.track);
+                 res.boxes.size(), res.timings.total, res.timings.preprocess, res.timings.ground,
+                 res.timings.cluster, res.timings.box, res.timings.track);
     ++frames_;
     RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 5000,
                          "%zu obstacles, %.1f ms/frame (%zu frames processed)", res.boxes.size(),

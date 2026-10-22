@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "lidar_obstacle_detector/config.hpp"
+#include "lidar_obstacle_detector/pcl_compat.hpp"
 
 namespace lidar_obstacle_detector {
 
@@ -42,8 +43,8 @@ class RansacGroundSegmenter : public GroundSegmenter<PointT> {
  public:
   explicit RansacGroundSegmenter(const GroundConfig &cfg) : cfg_(cfg) {}
 
-  void segment(const typename pcl::PointCloud<PointT>::ConstPtr &cloud,
-               pcl::Indices *ground, pcl::Indices *obstacles) override {
+  void segment(const typename pcl::PointCloud<PointT>::ConstPtr &cloud, pcl::Indices *ground,
+               pcl::Indices *obstacles) override {
     ground->clear();
     obstacles->clear();
     if (cloud->size() < 3) {
@@ -99,8 +100,8 @@ class PatchworkppGroundSegmenter : public GroundSegmenter<PointT> {
  public:
   explicit PatchworkppGroundSegmenter(const GroundConfig &cfg) : impl_(cfg) {}
 
-  void segment(const typename pcl::PointCloud<PointT>::ConstPtr &cloud,
-               pcl::Indices *ground, pcl::Indices *obstacles) override {
+  void segment(const typename pcl::PointCloud<PointT>::ConstPtr &cloud, pcl::Indices *ground,
+               pcl::Indices *obstacles) override {
     Eigen::MatrixXf xyz(cloud->size(), 3);
     for (size_t i = 0; i < cloud->size(); ++i) {
       const auto &p = cloud->points[i];

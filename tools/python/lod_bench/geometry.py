@@ -5,9 +5,9 @@ import numpy as np
 
 def corners_bev(center, size, yaw):
     """4x2 corners (counter-clockwise) of a BEV rectangle."""
-    l, w = size[0] / 2.0, size[1] / 2.0
+    hl, hw = size[0] / 2.0, size[1] / 2.0
     c, s = np.cos(yaw), np.sin(yaw)
-    local = np.array([[l, w], [-l, w], [-l, -w], [l, -w]])
+    local = np.array([[hl, hw], [-hl, hw], [-hl, -hw], [hl, -hw]])
     rot = np.array([[c, -s], [s, c]])
     return local @ rot.T + np.asarray(center[:2])
 

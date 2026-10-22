@@ -28,12 +28,12 @@ class LegacyAdapter : public PipelineAdapter {
     use_pca_box_ = getBool(params, "use_pca_box", false);
     use_tracking_ = getBool(params, "use_tracking", true);
     voxel_grid_size_ = getFloat(params, "voxel_grid_size", 0.2f);
-    roi_min_ = Eigen::Vector4f(getFloat(params, "roi_min_x", -30.f),
-                               getFloat(params, "roi_min_y", -30.f),
-                               getFloat(params, "roi_min_z", -2.5f), 1.f);
-    roi_max_ = Eigen::Vector4f(getFloat(params, "roi_max_x", 70.f),
-                               getFloat(params, "roi_max_y", 30.f),
-                               getFloat(params, "roi_max_z", 1.f), 1.f);
+    roi_min_ =
+        Eigen::Vector4f(getFloat(params, "roi_min_x", -30.f), getFloat(params, "roi_min_y", -30.f),
+                        getFloat(params, "roi_min_z", -2.5f), 1.f);
+    roi_max_ =
+        Eigen::Vector4f(getFloat(params, "roi_max_x", 70.f), getFloat(params, "roi_max_y", 30.f),
+                        getFloat(params, "roi_max_z", 1.f), 1.f);
     ground_thresh_ = getFloat(params, "ground_threshold", 0.3f);
     cluster_thresh_ = getFloat(params, "cluster_threshold", 0.6f);
     cluster_min_size_ = getInt(params, "cluster_min_size", 10);
@@ -42,8 +42,7 @@ class LegacyAdapter : public PipelineAdapter {
     iou_thresh_ = getFloat(params, "iou_threshold", 1.0f);
   }
 
-  FrameOutput process(const pcl::PointCloud<pcl::PointXYZI>::ConstPtr &input,
-                      double /*stamp*/,
+  FrameOutput process(const pcl::PointCloud<pcl::PointXYZI>::ConstPtr &input, double /*stamp*/,
                       const Eigen::Isometry3d & /*world_T_sensor*/) override {
     using Clock = std::chrono::steady_clock;
     FrameOutput out;
@@ -53,27 +52,24 @@ class LegacyAdapter : public PipelineAdapter {
     pcl::copyPointCloud(*input, *raw);
     const auto t1 = Clock::now();
 
-    auto filtered =
-        detector_.filterCloud(raw, voxel_grid_size_, roi_min_, roi_max_);
+    auto filtered = detector_.filterCloud(raw, voxel_grid_size_, roi_min_, roi_max_);
     const auto t2 = Clock::now();
     auto segmented = detector_.segmentPlane(filtered, 30, ground_thresh_);
     const auto t3 = Clock::now();
-    auto clusters = detector_.clustering(segmented.first, cluster_thresh_,
-                                         cluster_min_size_, cluster_max_size_);
+    auto clusters = detector_.clustering(segmented.first, cluster_thresh_, cluster_min_size_,
+                                         cluster_max_size_);
     const auto t4 = Clock::now();
 
     std::vector<legacy::Box> curr_boxes;
     for (auto &cluster : clusters) {
-      curr_boxes.emplace_back(
-          use_pca_box_
-              ? detector_.pcaBoundingBox(cluster, obstacle_id_)
-              : detector_.axisAlignedBoundingBox(cluster, obstacle_id_));
+      curr_boxes.emplace_back(use_pca_box_
+                                  ? detector_.pcaBoundingBox(cluster, obstacle_id_)
+                                  : detector_.axisAlignedBoundingBox(cluster, obstacle_id_));
       ++obstacle_id_;
     }
     const auto t5 = Clock::now();
     if (use_tracking_) {
-      detector_.obstacleTracking(prev_boxes_, &curr_boxes, displacement_thresh_,
-                                 iou_thresh_);
+      detector_.obstacleTracking(prev_boxes_, &curr_boxes, displacement_thresh_, iou_thresh_);
     }
     const auto t6 = Clock::now();
 
@@ -90,9 +86,8 @@ class LegacyAdapter : public PipelineAdapter {
 
     out.ground = toXYZ(*segmented.second);
     out.obstacles = toXYZ(*segmented.first);
-    out.timing_ms = {{"convert", ms(t0, t1)}, {"preprocess", ms(t1, t2)},
-                     {"ground", ms(t2, t3)},  {"cluster", ms(t3, t4)},
-                     {"box", ms(t4, t5)},     {"track", ms(t5, t6)},
+    out.timing_ms = {{"convert", ms(t0, t1)}, {"preprocess", ms(t1, t2)}, {"ground", ms(t2, t3)},
+                     {"cluster", ms(t3, t4)}, {"box", ms(t4, t5)},        {"track", ms(t5, t6)},
                      {"total", ms(t0, t6)}};
     return out;
   }

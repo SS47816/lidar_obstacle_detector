@@ -97,9 +97,7 @@ def main():
             for sd in tables["sample_data"]
             if sd["sample_token"] == first["token"]
             and by_token["sensor"][
-                by_token["calibrated_sensor"][sd["calibrated_sensor_token"]][
-                    "sensor_token"
-                ]
+                by_token["calibrated_sensor"][sd["calibrated_sensor_token"]]["sensor_token"]
             ]["channel"]
             == "LIDAR_TOP"
         )
@@ -124,9 +122,7 @@ def main():
         )
         while sd_token:
             sd = by_token["sample_data"][sd_token]
-            pts = np.fromfile(
-                os.path.join(root, sd["filename"]), dtype=np.float32
-            ).reshape(-1, 5)
+            pts = np.fromfile(os.path.join(root, sd["filename"]), dtype=np.float32).reshape(-1, 5)
             xyz = pts[:, :3] @ r_cs.T  # lidar -> bench (rotation only)
             points = np.hstack([xyz, pts[:, 3:4]])
 
@@ -142,16 +138,18 @@ def main():
                         by_token["instance"][a["instance_token"]]["category_token"]
                     ]["name"]
                     r_world = quat_to_rot(*a["rotation"])
-                    center = bench_T_world[:3, :3] @ np.array(a["translation"]) + bench_T_world[:3, 3]
+                    center = (
+                        bench_T_world[:3, :3] @ np.array(a["translation"]) + bench_T_world[:3, 3]
+                    )
                     yaw = yaw_of(bench_T_world[:3, :3] @ r_world)
-                    w, l, h = a["size"]
+                    width, length, height = a["size"]
                     objects.append(
                         box_record(
                             a["instance_token"],
                             cat,
                             coarse_class(cat),
                             center,
-                            (l, w, h),
+                            (length, width, height),
                             yaw,
                             a["num_lidar_pts"],
                             ann_velocity(a),
@@ -160,9 +158,7 @@ def main():
                 if sd_token in lidarseg:
                     seg = np.fromfile(os.path.join(root, lidarseg[sd_token]), dtype=np.uint8)
                     labels = seg_map[seg]
-            writer.add_frame(
-                points, sd["timestamp"] * 1e-6, world_T_bench, objects, labels
-            )
+            writer.add_frame(points, sd["timestamp"] * 1e-6, world_T_bench, objects, labels)
             sd_token = sd["next"]
         writer.close()
         print(f"{scene['name']}: {writer.num_frames} frames -> {out_dir}")

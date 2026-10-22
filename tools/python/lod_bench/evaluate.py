@@ -109,7 +109,6 @@ def evaluate_sequence(seq_dir, res_dir, cfg, min_pts, stats, acc):
             stats["timing"][k].append(v)
         if idx not in gt:
             continue
-        pose = np.asarray(fr["pose"]).reshape(4, 4)
         objs = gt[idx]
         targets = [
             o
@@ -167,22 +166,35 @@ def evaluate_sequence(seq_dir, res_dir, cfg, min_pts, stats, acc):
                 d = center_dist(g, p)
                 if d <= MATCH_DIST:
                     dist[i, j] = d
-        acc.update([gt_ids.setdefault(g["id"], len(gt_ids)) for g in targets], [int(p["id"]) for p in tracked], dist)
+        acc.update(
+            [gt_ids.setdefault(g["id"], len(gt_ids)) for g in targets],
+            [int(p["id"]) for p in tracked],
+            dist,
+        )
         for gi, pi, _ in match(targets, tracked, center_dist, MATCH_DIST):
             g, p = targets[gi], tracked[pi]
             if g.get("velocity") is not None and "velocity" in p:
-                stats["vel_err"].append(float(np.hypot(*(np.subtract(p["velocity"], g["velocity"])))))
+                stats["vel_err"].append(
+                    float(np.hypot(*(np.subtract(p["velocity"], g["velocity"]))))
+                )
 
         # --- ground segmentation --------------------------------------------
         if res.get("dumped"):
             name = f"{idx:06d}"
-            ground = np.fromfile(os.path.join(res_dir, "clouds", name + "_ground.bin"), np.float32).reshape(-1, 3)
-            obst = np.fromfile(os.path.join(res_dir, "clouds", name + "_obstacle.bin"), np.float32).reshape(-1, 3)
+            ground = np.fromfile(
+                os.path.join(res_dir, "clouds", name + "_ground.bin"), np.float32
+            ).reshape(-1, 3)
+            obst = np.fromfile(
+                os.path.join(res_dir, "clouds", name + "_obstacle.bin"), np.float32
+            ).reshape(-1, 3)
             raw = load_points(seq_dir, idx)[:, :3]
             roi = (
-                (raw[:, 0] >= cfg["roi_min_x"]) & (raw[:, 0] <= cfg["roi_max_x"])
-                & (raw[:, 1] >= cfg["roi_min_y"]) & (raw[:, 1] <= cfg["roi_max_y"])
-                & (raw[:, 2] >= cfg["roi_min_z"]) & (raw[:, 2] <= cfg["roi_max_z"])
+                (raw[:, 0] >= cfg["roi_min_x"])
+                & (raw[:, 0] <= cfg["roi_max_x"])
+                & (raw[:, 1] >= cfg["roi_min_y"])
+                & (raw[:, 1] <= cfg["roi_max_y"])
+                & (raw[:, 2] >= cfg["roi_min_z"])
+                & (raw[:, 2] <= cfg["roi_max_z"])
             )
             proc = np.vstack([ground, obst]) if len(ground) + len(obst) else np.zeros((0, 3))
             is_ground_proc = np.r_[np.ones(len(ground), bool), np.zeros(len(obst), bool)]
@@ -226,8 +238,15 @@ def summarize(stats, acc_list, names):
     summary = mh.compute_many(
         acc_list,
         names=names,
-        metrics=["mota", "idf1", "num_switches", "num_fragmentations", "mostly_tracked",
-                 "num_unique_objects", "recall"],
+        metrics=[
+            "mota",
+            "idf1",
+            "num_switches",
+            "num_fragmentations",
+            "mostly_tracked",
+            "num_unique_objects",
+            "recall",
+        ],
         generate_overall=True,
     )
     ov = summary.loc["OVERALL"]
@@ -256,7 +275,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True, help="benchmark dataset dir (one subdir per sequence)")
     ap.add_argument("--results", required=True, help="run dir (one subdir per sequence)")
-    ap.add_argument("--cfg", default=os.path.join(os.path.dirname(__file__), "..", "..", "configs", "bench_common.cfg"))
+    ap.add_argument(
+        "--cfg",
+        default=os.path.join(os.path.dirname(__file__), "..", "..", "configs", "bench_common.cfg"),
+    )
     ap.add_argument("--min-pts", type=int, default=5)
     ap.add_argument("--out", help="write metrics json here")
     args = ap.parse_args()

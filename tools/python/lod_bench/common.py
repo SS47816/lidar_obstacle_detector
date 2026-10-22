@@ -66,16 +66,12 @@ class SequenceWriter:
     def add_frame(self, points, t, pose, objects=None, ground_labels=None):
         """points: (N, 4) float array in the bench frame; pose: 4x4 world_T_bench."""
         idx = self.num_frames
-        points.astype(np.float32).tofile(
-            os.path.join(self.out_dir, "points", f"{idx:06d}.bin")
-        )
+        points.astype(np.float32).tofile(os.path.join(self.out_dir, "points", f"{idx:06d}.bin"))
         label_path = None
         if ground_labels is not None:
             assert len(ground_labels) == len(points)
             label_path = f"labels/{idx:06d}.bin"
-            ground_labels.astype(np.uint8).tofile(
-                os.path.join(self.out_dir, label_path)
-            )
+            ground_labels.astype(np.uint8).tofile(os.path.join(self.out_dir, label_path))
         rec = {
             "idx": idx,
             "t": float(t),
@@ -121,6 +117,6 @@ def read_sequence(seq_dir):
 
 
 def load_points(seq_dir, idx):
-    return np.fromfile(
-        os.path.join(seq_dir, "points", f"{idx:06d}.bin"), dtype=np.float32
-    ).reshape(-1, 4)
+    return np.fromfile(os.path.join(seq_dir, "points", f"{idx:06d}.bin"), dtype=np.float32).reshape(
+        -1, 4
+    )

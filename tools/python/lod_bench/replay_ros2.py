@@ -61,9 +61,16 @@ class Replayer(Node):
         t.header.frame_id = "odom"
         t.child_frame_id = self.args.frame
         tr = pose[:3, 3] - self.origin
-        t.transform.translation.x, t.transform.translation.y, t.transform.translation.z = map(float, tr)
+        t.transform.translation.x, t.transform.translation.y, t.transform.translation.z = map(
+            float, tr
+        )
         q = rot_to_quat(pose[:3, :3])
-        t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w = q
+        (
+            t.transform.rotation.x,
+            t.transform.rotation.y,
+            t.transform.rotation.z,
+            t.transform.rotation.w,
+        ) = q
         return t
 
     def run(self):

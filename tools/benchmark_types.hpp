@@ -44,13 +44,11 @@ struct FrameOutput {
 class PipelineAdapter {
  public:
   virtual ~PipelineAdapter() = default;
-  virtual FrameOutput process(
-      const pcl::PointCloud<pcl::PointXYZI>::ConstPtr &cloud, double stamp,
-      const Eigen::Isometry3d &world_T_sensor) = 0;
+  virtual FrameOutput process(const pcl::PointCloud<pcl::PointXYZI>::ConstPtr &cloud, double stamp,
+                              const Eigen::Isometry3d &world_T_sensor) = 0;
 };
 
-inline double ms(std::chrono::steady_clock::time_point a,
-                 std::chrono::steady_clock::time_point b) {
+inline double ms(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) {
   return std::chrono::duration<double, std::milli>(b - a).count();
 }
 

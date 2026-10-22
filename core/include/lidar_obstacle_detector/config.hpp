@@ -63,13 +63,13 @@ struct BoxConfig {
 struct TrackerConfig {
   bool enabled = true;
   TrackCost cost = TrackCost::kCenterDistance;
-  float max_distance = 2.f;      // [m] association gate on predicted centre distance
-  float min_giou = -0.5f;        // GIoU gate (cost = kGIoU)
-  int min_hits = 2;              // updates before a track is confirmed
-  float max_age = 0.5f;          // [s] keep a lost track alive this long
-  float accel_noise = 3.f;       // [m/s^2] process noise of the constant-velocity model
-  float meas_noise = 0.3f;       // [m] measurement noise of the box centre
-  float size_smoothing = 0.3f;   // EMA weight of a new size measurement
+  float max_distance = 2.f;     // [m] association gate on predicted centre distance
+  float min_giou = -0.5f;       // GIoU gate (cost = kGIoU)
+  int min_hits = 2;             // updates before a track is confirmed
+  float max_age = 0.5f;         // [s] keep a lost track alive this long
+  float accel_noise = 3.f;      // [m/s^2] process noise of the constant-velocity model
+  float meas_noise = 0.3f;      // [m] measurement noise of the box centre
+  float size_smoothing = 0.3f;  // EMA weight of a new size measurement
 };
 
 struct PipelineConfig {
@@ -101,7 +101,6 @@ const std::vector<ParamInfo> &parameterTable();
 // Read / write a parameter by name, values as strings ("true", "0.3", "lshape").
 // setParameter() throws std::invalid_argument on unknown names or bad values.
 std::string getParameter(const PipelineConfig &config, const std::string &name);
-void setParameter(PipelineConfig *config, const std::string &name,
-                  const std::string &value);
+void setParameter(PipelineConfig *config, const std::string &name, const std::string &value);
 
 }  // namespace lidar_obstacle_detector
