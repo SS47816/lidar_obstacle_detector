@@ -1,0 +1,39 @@
+[workspace]
+name = "lidar_obstacle_detector"
+version = "2.0.0"
+description = "3D LiDAR obstacle detection & tracking (ROS-agnostic core + ROS 1/ROS 2 wrappers)"
+authors = ["Shuo Sun"]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+# --------------------------------------------------------------------------
+# core: plain CMake build of the ROS-agnostic library, tests and benchmark
+# --------------------------------------------------------------------------
+[feature.core.dependencies]
+cxx-compiler = "*"
+cmake = ">=3.16"
+ninja = "*"
+pkg-config = "*"
+pcl = ">=1.12"
+eigen = ">=3.3"
+gtest = "*"
+python = "3.12.*"
+numpy = "*"
+pandas = "*"
+pyarrow = "*"
+pyquaternion = "*"
+scipy = "*"
+matplotlib = "*"
+s5cmd = "*"
+nlohmann_json = "*"
+
+[feature.core.pypi-dependencies]
+motmetrics = "*"
+
+[feature.core.tasks]
+configure = "cmake -S . -B build/core -G Ninja -DCMAKE_BUILD_TYPE=Release -DLOD_BUILD_TESTS=ON -DLOD_BUILD_TOOLS=ON"
+build = { cmd = "cmake --build build/core", depends-on = ["configure"] }
+test = { cmd = "ctest --test-dir build/core --output-on-failure", depends-on = ["build"] }
+
+[environments]
+core = { features = ["core"], solve-group = "core" }
