@@ -25,6 +25,7 @@ COLUMNS = [
     ("ground_iou", "Ground IoU", "{:.3f}"),
     ("object_pts_lost_to_ground", "Obj. pts lost", "{:.1%}"),
     ("structures_per_frame", "Structures / frame", "{:.1f}"),
+    ("label_accuracy", "Label acc.", "{:.1%}"),
 ]
 
 

@@ -44,6 +44,18 @@ from geometry import (  # noqa: E402
 
 MATCH_DIST = 2.0  # [m] association gate (as in the nuScenes tracking benchmark)
 
+# Learned detector labels -> evaluation classes ("unknown" from clustering is not scored)
+LABEL_TO_CLS = {
+    "car": "vehicle",
+    "truck": "vehicle",
+    "bus": "vehicle",
+    "trailer": "vehicle",
+    "construction_vehicle": "vehicle",
+    "pedestrian": "pedestrian",
+    "motorcycle": "cyclist",
+    "bicycle": "cyclist",
+}
+
 
 def load_cfg(path):
     cfg = {}
@@ -134,6 +146,10 @@ def evaluate_sequence(seq_dir, res_dir, cfg, min_pts, stats, acc):
             g, p = targets[gi], preds[pi]
             if d <= 1.0 and g["size"][0] > 7.0:
                 stats["hit_1m_large"] += 1
+            pred_cls = LABEL_TO_CLS.get(p.get("label", "unknown"))
+            if pred_cls is not None:
+                stats["labelled"] += 1
+                stats["label_correct"] += int(pred_cls == g["cls"])
             v = g.get("velocity")
             if g["cls"] == "vehicle" and v is not None and np.hypot(*v) > 2.0:
                 stats["heading_err"].append(heading_error_mod180(g["yaw"], p["yaw"]))
@@ -249,6 +265,8 @@ def summarize(stats, acc_list, names):
     )
     out["recall@1m_large"] = stats["hit_1m_large"] / max(stats["n_gt_large"], 1)
     out["structures_per_frame"] = stats["n_structures"] / max(stats["frames"], 1)
+    if stats["labelled"]:
+        out["label_accuracy"] = stats["label_correct"] / stats["labelled"]
 
     mh = mm.metrics.create()
     summary = mh.compute_many(
