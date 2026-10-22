@@ -1,0 +1,99 @@
+[workspace]
+name = "lidar_obstacle_detector"
+version = "2.0.0"
+description = "3D LiDAR obstacle detection & tracking (ROS-agnostic core + ROS 1/ROS 2 wrappers)"
+authors = ["Shuo Sun"]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+# --------------------------------------------------------------------------
+# core: plain CMake build of the ROS-agnostic library, tests and benchmark
+# --------------------------------------------------------------------------
+[feature.core.dependencies]
+cxx-compiler = "*"
+cmake = ">=3.16"
+ninja = "*"
+pkg-config = "*"
+pcl = ">=1.12"
+eigen = ">=3.3"
+gtest = "*"
+python = "3.12.*"
+numpy = "*"
+pandas = "*"
+pyarrow = "*"
+pyquaternion = "*"
+scipy = "*"
+matplotlib = "*"
+s5cmd = "*"
+nlohmann_json = "*"
+clang-format = "19.*"
+ffmpeg = "*"
+pre-commit = "*"
+
+[feature.core.pypi-dependencies]
+motmetrics = "*"
+
+[feature.core.tasks]
+configure = "cmake -S . -B build/core -G Ninja -DCMAKE_BUILD_TYPE=Release -DLOD_BUILD_TESTS=ON -DLOD_BUILD_TOOLS=ON"
+build = { cmd = "cmake --build build/core", depends-on = ["configure"] }
+test = { cmd = "ctest --test-dir build/core --output-on-failure", depends-on = ["build"] }
+
+# --------------------------------------------------------------------------
+# ROS 2 Jazzy (RoboStack): colcon build of the ament package
+# --------------------------------------------------------------------------
+[feature.jazzy]
+channels = ["https://prefix.dev/robostack-jazzy"]
+
+[feature.jazzy.dependencies]
+ros-jazzy-ros-base = "*"
+ros-jazzy-pcl-conversions = "*"
+ros-jazzy-vision-msgs = "*"
+ros-jazzy-visualization-msgs = "*"
+ros-jazzy-tf2-ros = "*"
+ros-jazzy-tf2-eigen = "*"
+ros-jazzy-rclcpp-components = "*"
+ros-jazzy-autoware-perception-msgs = "*"
+ros-jazzy-rosbag2 = "*"
+ros-jazzy-ament-cmake-gtest = "*"
+colcon-common-extensions = "*"
+cxx-compiler = "*"
+cmake = ">=3.16"
+ninja = "*"
+pkg-config = "*"
+
+[feature.jazzy.pypi-dependencies]
+rosbags = "*"
+
+[feature.jazzy.tasks]
+build = "colcon build --base-paths . --build-base build/jazzy --install-base install/jazzy --cmake-args -DCMAKE_BUILD_TYPE=Release -G Ninja"
+test = { cmd = "colcon test --base-paths . --build-base build/jazzy --install-base install/jazzy --event-handlers console_direct+ && colcon test-result --test-result-base build/jazzy --verbose", depends-on = ["build"] }
+
+# --------------------------------------------------------------------------
+# ROS 1 Noetic (RoboStack): catkin_tools build of the catkin package
+# --------------------------------------------------------------------------
+[feature.noetic]
+channels = ["https://prefix.dev/robostack-noetic"]
+
+[feature.noetic.dependencies]
+ros-noetic-ros-base = "*"
+ros-noetic-pcl-ros = "*"
+ros-noetic-pcl-conversions = "*"
+ros-noetic-jsk-recognition-msgs = "*"
+ros-noetic-dynamic-reconfigure = "*"
+ros-noetic-tf2-ros = "*"
+ros-noetic-tf2-geometry-msgs = "*"
+ros-noetic-rosbag = "*"
+catkin_tools = "*"
+cxx-compiler = "*"
+cmake = ">=3.16"
+ninja = "*"
+pkg-config = "*"
+
+[feature.noetic.tasks]
+workspace = "mkdir -p build/noetic_ws/src && ln -sfn $PIXI_PROJECT_ROOT build/noetic_ws/src/lidar_obstacle_detector && cd build/noetic_ws && (test -d .catkin_tools || catkin init)"
+build = { cmd = "cd build/noetic_ws && catkin build --no-status -DCMAKE_BUILD_TYPE=Release", depends-on = ["workspace"] }
+
+[environments]
+core = { features = ["core"], solve-group = "core" }
+jazzy = { features = ["jazzy"], no-default-feature = true }
+noetic = { features = ["noetic"], no-default-feature = true }

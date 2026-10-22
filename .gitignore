@@ -51,3 +51,11 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+
+# pixi / build outputs
+.pixi/
+build/
+install/
+log/
+__pycache__/
+*.pyc

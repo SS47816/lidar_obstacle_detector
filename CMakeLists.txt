@@ -1,224 +1,193 @@
-cmake_minimum_required(VERSION 3.0.2)
-project(lidar_obstacle_detector)
+cmake_minimum_required(VERSION 3.16)
+project(lidar_obstacle_detector VERSION 2.0.0 LANGUAGES C CXX)  # C: FindMPI (via PCL -> VTK) needs it
 
-## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++14)
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
+# Build mode: catkin (ROS 1), ament (ROS 2) or plain CMake (no ROS)
+set(LOD_ROS_VERSION "$ENV{ROS_VERSION}" CACHE STRING "1, 2 or empty (plain CMake)")
+
+option(LOD_BUILD_TESTS "Build unit tests" OFF)
+option(LOD_BUILD_TOOLS "Build the offline benchmark CLI" OFF)
+option(LOD_WITH_OPENMP "Parallelise per-cluster work with OpenMP" ON)
+option(LOD_SANITIZE "Build with address & undefined-behaviour sanitizers" OFF)
+
+if(LOD_SANITIZE)
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+
 find_package(Eigen3 REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common filters search kdtree sample_consensus segmentation)
+if(LOD_WITH_OPENMP)
+  find_package(OpenMP)
+endif()
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  rospy
-  std_msgs
-  pcl_ros
-  tf2_ros
-  tf2_geometry_msgs
-  dynamic_reconfigure
-  autoware_msgs
-  jsk_recognition_msgs
+# ------------------------------------------------------------------------------
+# Vendored Patchwork++ (BSD-2-Clause), see third_party/patchworkpp/VENDORED.md
+# ------------------------------------------------------------------------------
+add_library(lod_patchworkpp STATIC
+  third_party/patchworkpp/src/patchworkpp.cpp
+  third_party/patchworkpp/src/plane_fit.cpp
+)
+set_target_properties(lod_patchworkpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(lod_patchworkpp PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/patchworkpp/include>)
+target_link_libraries(lod_patchworkpp PUBLIC Eigen3::Eigen)
+target_compile_options(lod_patchworkpp PRIVATE -w)  # third-party code, keep our build quiet
+
+# ------------------------------------------------------------------------------
+# ROS-agnostic core library
+# ------------------------------------------------------------------------------
+add_library(lidar_obstacle_detector_core
+  core/src/config.cpp
+  core/src/hungarian.cpp
+  core/src/obstacle_detector.cpp
+  core/src/occupancy.cpp
+  core/src/patchworkpp_segmenter.cpp
+  core/src/tracker.cpp
+  core/src/types.cpp
+)
+set_target_properties(lidar_obstacle_detector_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(lidar_obstacle_detector_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/core/include>
+  $<INSTALL_INTERFACE:include>
+  ${PCL_INCLUDE_DIRS}
+)
+target_compile_definitions(lidar_obstacle_detector_core PUBLIC ${PCL_DEFINITIONS})
+target_compile_options(lidar_obstacle_detector_core PRIVATE -Wall -Wextra)
+target_link_libraries(lidar_obstacle_detector_core
+  PUBLIC ${PCL_LIBRARIES} Eigen3::Eigen
+  PRIVATE $<BUILD_INTERFACE:lod_patchworkpp>
+)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(lidar_obstacle_detector_core PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+set(LOD_TEST_SOURCES
+  test/test_box_fitting.cpp
+  test/test_clustering.cpp
+  test/test_config.cpp
+  test/test_geometry.cpp
+  test/test_hungarian.cpp
+  test/test_occupancy.cpp
+  test/test_pipeline.cpp
+  test/test_tracker.cpp
 )
 
-## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+# ------------------------------------------------------------------------------
+# ROS 2 (ament): composable node + standalone executable
+# ------------------------------------------------------------------------------
+if(LOD_ROS_VERSION STREQUAL "2")
+  find_package(ament_cmake REQUIRED)
+  find_package(rclcpp REQUIRED)
+  find_package(rclcpp_components REQUIRED)
+  find_package(sensor_msgs REQUIRED)
+  find_package(vision_msgs REQUIRED)
+  find_package(visualization_msgs REQUIRED)
+  find_package(nav_msgs REQUIRED)
+  find_package(tf2_ros REQUIRED)
+  find_package(tf2_eigen REQUIRED)
+  find_package(pcl_conversions REQUIRED)
+  find_package(autoware_perception_msgs QUIET)
 
+  add_library(obstacle_detector_component SHARED ros2/obstacle_detector_node.cpp)
+  target_link_libraries(obstacle_detector_component
+    lidar_obstacle_detector_core
+    rclcpp::rclcpp
+    rclcpp_components::component
+    ${sensor_msgs_TARGETS}
+    ${vision_msgs_TARGETS}
+    ${visualization_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    tf2_ros::tf2_ros
+    tf2_eigen::tf2_eigen
+    ${pcl_conversions_LIBRARIES}
+  )
+  # pcl_conversions exports no CMake target on all distros
+  target_include_directories(obstacle_detector_component PRIVATE ${pcl_conversions_INCLUDE_DIRS})
+  if(autoware_perception_msgs_FOUND)
+    target_compile_definitions(obstacle_detector_component PRIVATE LOD_HAVE_AUTOWARE)
+    target_link_libraries(obstacle_detector_component ${autoware_perception_msgs_TARGETS})
+    message(STATUS "lidar_obstacle_detector: publishing autoware_perception_msgs/DetectedObjects")
+  endif()
+  rclcpp_components_register_node(obstacle_detector_component
+    PLUGIN "lidar_obstacle_detector::ObstacleDetectorNode"
+    EXECUTABLE obstacle_detector_node)
 
-## Uncomment this if the package has a setup.py. This macro ensures
-## modules and global scripts declared therein get installed
-## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
+  install(TARGETS obstacle_detector_component lidar_obstacle_detector_core
+    ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+  install(DIRECTORY core/include/ DESTINATION include)
+  install(DIRECTORY launch config rviz DESTINATION share/${PROJECT_NAME}
+    PATTERN "*.launch" EXCLUDE PATTERN "lidar_obstacle_detector.rviz" EXCLUDE PATTERN "mai_city.rviz" EXCLUDE)
 
-################################################
-## Declare ROS messages, services and actions ##
-################################################
+  if(BUILD_TESTING)
+    find_package(ament_cmake_gtest REQUIRED)
+    ament_add_gtest(lod_tests ${LOD_TEST_SOURCES})
+    target_link_libraries(lod_tests lidar_obstacle_detector_core)
+  endif()
+  ament_package()
 
-## To declare and build messages, services or actions from within this
-## package, follow these steps:
-## * Let MSG_DEP_SET be the set of packages whose message types you use in
-##   your messages/services/actions (e.g. std_msgs, actionlib_msgs, ...).
-## * In the file package.xml:
-##   * add a build_depend tag for "message_generation"
-##   * add a build_depend and a exec_depend tag for each package in MSG_DEP_SET
-##   * If MSG_DEP_SET isn't empty the following dependency has been pulled in
-##     but can be declared for certainty nonetheless:
-##     * add a exec_depend tag for "message_runtime"
-## * In this file (CMakeLists.txt):
-##   * add "message_generation" and every package in MSG_DEP_SET to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * add "message_runtime" and every package in MSG_DEP_SET to
-##     catkin_package(CATKIN_DEPENDS ...)
-##   * uncomment the add_*_files sections below as needed
-##     and list every .msg/.srv/.action file to be processed
-##   * uncomment the generate_messages entry below
-##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
+# ------------------------------------------------------------------------------
+# ROS 1 (catkin): node with dynamic_reconfigure
+# ------------------------------------------------------------------------------
+elseif(LOD_ROS_VERSION STREQUAL "1")
+  find_package(catkin REQUIRED COMPONENTS
+    roscpp sensor_msgs visualization_msgs nav_msgs pcl_conversions tf2_ros tf2_eigen
+    dynamic_reconfigure jsk_recognition_msgs)
+  find_package(autoware_msgs QUIET)
+  generate_dynamic_reconfigure_options(cfg/obstacle_detector.cfg)
+  catkin_package(
+    INCLUDE_DIRS core/include
+    LIBRARIES lidar_obstacle_detector_core
+    CATKIN_DEPENDS roscpp sensor_msgs visualization_msgs nav_msgs jsk_recognition_msgs
+  )
+  add_executable(obstacle_detector_node ros1/obstacle_detector_node.cpp)
+  target_include_directories(obstacle_detector_node PRIVATE ${catkin_INCLUDE_DIRS})
+  target_link_libraries(obstacle_detector_node lidar_obstacle_detector_core ${catkin_LIBRARIES})
+  add_dependencies(obstacle_detector_node ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
+  if(autoware_msgs_FOUND)
+    target_compile_definitions(obstacle_detector_node PRIVATE LOD_HAVE_AUTOWARE)
+    target_include_directories(obstacle_detector_node PRIVATE ${autoware_msgs_INCLUDE_DIRS})
+    add_dependencies(obstacle_detector_node ${autoware_msgs_EXPORTED_TARGETS})
+    message(STATUS "lidar_obstacle_detector: publishing autoware_msgs/DetectedObjectArray")
+  endif()
 
-## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+  install(TARGETS obstacle_detector_node lidar_obstacle_detector_core
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+  install(DIRECTORY core/include/ DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION})
+  install(DIRECTORY launch rviz DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+    PATTERN "*.launch.py" EXCLUDE PATTERN "*ros2*" EXCLUDE)
 
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+  if(CATKIN_ENABLE_TESTING)
+    catkin_add_gtest(lod_tests ${LOD_TEST_SOURCES} test/gtest_main.cpp)
+    target_link_libraries(lod_tests lidar_obstacle_detector_core)
+  endif()
+endif()
 
-## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
+# ------------------------------------------------------------------------------
+# Unit tests & benchmark CLI (plain CMake)
+# ------------------------------------------------------------------------------
+if(LOD_BUILD_TESTS AND NOT LOD_ROS_VERSION)
+  enable_testing()
+  find_package(GTest REQUIRED)
+  add_executable(lod_tests ${LOD_TEST_SOURCES})
+  target_link_libraries(lod_tests PRIVATE lidar_obstacle_detector_core GTest::gtest_main)
+  include(GoogleTest)
+  gtest_discover_tests(lod_tests)
+endif()
 
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
-
-################################################
-## Declare ROS dynamic reconfigure parameters ##
-################################################
-
-## To declare and build dynamic reconfigure parameters within this
-## package, follow these steps:
-## * In the file package.xml:
-##   * add a build_depend and a exec_depend tag for "dynamic_reconfigure"
-## * In this file (CMakeLists.txt):
-##   * add "dynamic_reconfigure" to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * uncomment the "generate_dynamic_reconfigure_options" section below
-##     and list every .cfg file to be processed
-
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-generate_dynamic_reconfigure_options(
-  cfg/obstacle_detector.cfg
-)
-
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if your package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES lidar_obstacle_detector
-  CATKIN_DEPENDS roscpp rospy std_msgs pcl_ros tf2_ros tf2_geometry_msgs dynamic_reconfigure autoware_msgs jsk_recognition_msgs
-  DEPENDS system_lib
-)
-
-###########
-## Build ##
-###########
-
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-include_directories(
-  include
-  ${EIGEN3_INCLUDE_DIRS}
-  ${catkin_INCLUDE_DIRS}
-  ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake
-)
-
-## Declare a C++ library
-add_library(${PROJECT_NAME}
-  include/${PROJECT_NAME}/box.hpp
-  include/${PROJECT_NAME}/obstacle_detector.hpp
-)
-
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Declare a C++ executable
-## With catkin_make all packages are built within a single CMake context
-## The recommended prefix ensures that target names across packages don't collide
-add_executable(obstacle_detector_node src/obstacle_detector_node.cpp)
-
-## Rename C++ executable without prefix
-## The above recommended prefix causes long target names, the following renames the
-## target back to the shorter version for ease of user use
-## e.g. "rosrun someones_pkg node" instead of "rosrun someones_pkg someones_pkg_node"
-# set_target_properties(${PROJECT_NAME}_node PROPERTIES OUTPUT_NAME node PREFIX "")
-set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
-
-## Add cmake target dependencies of the executable
-## same as for the library above
-add_dependencies(obstacle_detector_node
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  # obstacle_detector_gencfg
-  ${PROJECT_NAME}
-)
-
-## Specify libraries to link a library or executable target against
-target_link_libraries(obstacle_detector_node
-  ${catkin_LIBRARIES}
-  ${${PROJECT_NAME}_LIBRARY}
-  ${PROJECT_NAME}
-)
-
-#############
-## Install ##
-#############
-
-# all install targets should use catkin DESTINATION variables
-# See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
-
-## Mark executable scripts (Python etc.) for installation
-## in contrast to setup.py, you can choose the destination
-# catkin_install_python(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
-
-## Mark executables for installation
-## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
-# install(TARGETS ${PROJECT_NAME}_node
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
-
-## Mark libraries for installation
-## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_libraries.html
-# install(TARGETS ${PROJECT_NAME}
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
-# )
-
-## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
-
-## Mark other files for installation (e.g. launch and bag files, etc.)
-# install(FILES
-#   # myfile1
-#   # myfile2
-#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
-
-#############
-## Testing ##
-#############
-
-## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_lidar_obstacle_detector.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
-
-## Add folders to be run by python nosetests
-# catkin_add_nosetests(test)
+if(LOD_BUILD_TOOLS)
+  find_package(nlohmann_json REQUIRED)
+  add_executable(lod_benchmark tools/lod_benchmark.cpp)
+  target_include_directories(lod_benchmark PRIVATE tools legacy/include)
+  target_compile_definitions(lod_benchmark PRIVATE LOD_HAVE_CORE)
+  target_link_libraries(lod_benchmark PRIVATE lidar_obstacle_detector_core nlohmann_json::nlohmann_json)
+endif()

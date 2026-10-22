@@ -1,4 +1,4 @@
-/* box.hpp
+/* box.hpp (v1 legacy copy, kept only as the benchmark baseline)
 
  * Copyright (C) 2021 SS47816
 
@@ -9,6 +9,9 @@
 #pragma once
 
 #include <Eigen/Geometry>
+
+namespace lidar_obstacle_detector {
+namespace legacy {
 
 struct Box {
  public:
@@ -32,3 +35,6 @@ struct Box {
         dimension(dimension),
         quaternion(quaternion) {}
 };
+
+}  // namespace legacy
+}  // namespace lidar_obstacle_detector

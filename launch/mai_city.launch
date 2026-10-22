@@ -9,7 +9,9 @@
     <param name="cloud_clusters_topic"                value="obstacle_detector/cloud_clusters"/>
     <param name="jsk_bboxes_topic"                    value="obstacle_detector/jsk_bboxes"/>
     <param name="autoware_objects_topic"              value="obstacle_detector/objects"/>
-    <!-- Parameters -->
+    <!-- Parameters (all algorithm parameters are in dynamic_reconfigure; `preset` seeds them) -->
+    <param name="preset"                              value="fast"/>  <!-- legacy | fast | accurate -->
+    <param name="tracking_frame"                      value=""/>      <!-- e.g. odom; "" = lidar frame -->
     <param name="bbox_target_frame"                   value="velodyne"/>
   </node>
 

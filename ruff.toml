@@ -1,0 +1,6 @@
+line-length = 100
+target-version = "py38"
+exclude = ["third_party", "legacy"]
+
+[lint]
+select = ["E", "F", "W", "I"]

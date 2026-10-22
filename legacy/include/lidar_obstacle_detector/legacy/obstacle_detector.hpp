@@ -1,4 +1,7 @@
-/* obstacle_detector.hpp
+/* obstacle_detector.hpp (v1 legacy copy, kept only as the benchmark baseline)
+
+ * Changes vs. v1: wrapped in namespace `legacy`, guarded the out-of-bounds
+ * read on unmatched boxes in obstacleTracking(), removed per-frame stdout.
 
  * Copyright (C) 2021 SS47816
 
@@ -26,9 +29,11 @@
 #include <utility>
 #include <vector>
 
-#include "lidar_obstacle_detector/box.hpp"
+#include "lidar_obstacle_detector/legacy/box.hpp"
 
 namespace lidar_obstacle_detector {
+namespace legacy {
+
 template <typename PointT>
 class ObstacleDetector {
  public:
@@ -357,6 +362,7 @@ void ObstacleDetector<PointT>::obstacleTracking(
     matches = hungarian(connection_matrix);
 
     for (int j = 0; j < matches.size(); ++j) {
+      if (matches[j] < 0) continue;  // v2 baseline fix: unmatched -> OOB read
       // find the index of the previous box that the current box corresponds to
       const auto pre_id = pre_ids[matches[j]];
       const auto pre_index = searchBoxIndex(prev_boxes, pre_id);
@@ -492,10 +498,6 @@ std::vector<int> ObstacleDetector<PointT>::hungarian(
       count++;
   }
 
-  std::cout << "For: " << right_pair.size()
-            << " current frame bounding boxes, found: " << count
-            << " matches in previous frame! " << std::endl;
-
   return right_pair;
 }
 
@@ -509,4 +511,5 @@ int ObstacleDetector<PointT>::searchBoxIndex(const std::vector<Box> &boxes,
   return -1;
 }
 
+}  // namespace legacy
 }  // namespace lidar_obstacle_detector

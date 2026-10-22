@@ -1,0 +1,29 @@
+# ROS 2 parameters of the obstacle_detector node. Every parameter is optional:
+# unspecified ones take the value of the selected `preset`. All parameters
+# except `preset` can be changed at runtime (e.g. with rqt_reconfigure or
+# `ros2 param set /obstacle_detector cluster_threshold 0.5`).
+#
+# Note: ROS 2 parameters are typed -- write floating point values with a
+# decimal point (1.0, not 1).
+/**:
+  ros__parameters:
+    preset: fast              # legacy | fast | accurate
+    target_frame: ""          # frame of the published boxes ("" = lidar frame)
+    tracking_frame: ""        # fixed frame for tracking, e.g. odom ("" = lidar frame)
+
+    # Region of interest and ego vehicle, in the lidar frame (x fwd, y left, z up)
+    roi_min_x: -30.0
+    roi_max_x: 70.0
+    roi_min_y: -30.0
+    roi_max_y: 30.0
+    roi_min_z: -2.5
+    roi_max_z: 1.0
+    remove_ego: true
+    ego_min_x: -1.5
+    ego_max_x: 2.6
+    ego_min_y: -1.7
+    ego_max_y: 1.7
+    ego_min_z: -1.0
+    ego_max_z: -0.4
+
+    sensor_height: 1.73       # lidar height above the ground (Patchwork++)
