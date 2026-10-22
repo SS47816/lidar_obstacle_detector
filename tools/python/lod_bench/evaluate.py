@@ -5,7 +5,7 @@ that have no labels, so plain precision / MOTA would mostly measure "how much un
 stuff is there". We therefore report:
 
 * detection: recall of obstacle-class GT (vehicle/pedestrian/cyclist, >= min_pts points,
-  centre in the eval ROI) at BEV centre distance <= 1 m and at BEV IoU >= 0.3
+  centre in the eval ROI) at BEV centre distance <= 1 m / 2 m and at BEV IoU >= 0.3
 * segmentation: over-segmentation (GT split into >= 2 predicted boxes) and
   under-segmentation (GT merged with another GT into one predicted box)
 * boxes: mean BEV IoU and orientation error (mod 90 deg, vehicles) of centre matches
@@ -127,6 +127,7 @@ def evaluate_sequence(seq_dir, res_dir, cfg, min_pts, stats, acc):
         cm = match(targets, preds, center_dist, MATCH_DIST)
         for gi, pi, d in cm:
             g, p = targets[gi], preds[pi]
+            stats["hit_2m"] += 1
             if d <= 1.0:
                 stats["hit_1m"] += 1
                 stats["hit_1m_cls"][g["cls"]] += 1
@@ -210,6 +211,7 @@ def summarize(stats, acc_list, names):
     out["gt_objects"] = stats["n_gt"]
     out["pred_per_frame"] = stats["n_pred"] / max(stats["frames"], 1)
     out["recall@1m"] = stats["hit_1m"] / n_gt
+    out["recall@2m"] = stats["hit_2m"] / n_gt
     for c in OBSTACLE_CLASSES:
         out[f"recall@1m_{c}"] = stats["hit_1m_cls"][c] / max(stats["n_gt_cls"][c], 1)
     out["recall@iou0.3"] = stats["hit_iou03"] / n_gt
