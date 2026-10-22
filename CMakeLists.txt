@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(lidar_obstacle_detector VERSION 2.0.0 LANGUAGES CXX)
+project(lidar_obstacle_detector VERSION 2.0.0 LANGUAGES C CXX)  # C: FindMPI (via PCL -> VTK) needs it
 
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
@@ -167,7 +167,7 @@ elseif(LOD_ROS_VERSION STREQUAL "1")
     PATTERN "*.launch.py" EXCLUDE PATTERN "*ros2*" EXCLUDE)
 
   if(CATKIN_ENABLE_TESTING)
-    catkin_add_gtest(lod_tests ${LOD_TEST_SOURCES})
+    catkin_add_gtest(lod_tests ${LOD_TEST_SOURCES} test/gtest_main.cpp)
     target_link_libraries(lod_tests lidar_obstacle_detector_core)
   endif()
 endif()
