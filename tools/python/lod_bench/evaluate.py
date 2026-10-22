@@ -8,7 +8,8 @@ stuff is there". We therefore report:
   centre in the eval ROI) at BEV centre distance <= 1 m / 2 m and at BEV IoU >= 0.3
 * segmentation: over-segmentation (GT split into >= 2 predicted boxes) and
   under-segmentation (GT merged with another GT into one predicted box)
-* boxes: mean BEV IoU and orientation error (mod 90 deg, vehicles) of centre matches
+* boxes: mean BEV IoU and orientation error (mod 90 deg, vehicles) of centre matches, and the
+  heading error of moving vehicles (front/back counts)
 * tracking: FP-filtered CLEAR/ID metrics (predictions further than 2 m from every GT are
   ignored): MOTA*, IDF1, ID switches, fragmentations, mostly-tracked ratio, and the
   velocity error of matched tracks
@@ -35,6 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import OBSTACLE_CLASSES, load_points, read_sequence  # noqa: E402
 from geometry import (  # noqa: E402
     bev_iou,
+    heading_error_mod180,
     orientation_error_mod90,
     points_in_bev_box,
     points_in_box,
@@ -124,8 +126,17 @@ def evaluate_sequence(seq_dir, res_dir, cfg, min_pts, stats, acc):
 
         # --- detection recall & box quality ---------------------------------
         cm = match(targets, preds, center_dist, MATCH_DIST)
+        stats["n_structures"] += len(res.get("structures", []))
+        for o in targets:
+            if o["size"][0] > 7.0:
+                stats["n_gt_large"] += 1
         for gi, pi, d in cm:
             g, p = targets[gi], preds[pi]
+            if d <= 1.0 and g["size"][0] > 7.0:
+                stats["hit_1m_large"] += 1
+            v = g.get("velocity")
+            if g["cls"] == "vehicle" and v is not None and np.hypot(*v) > 2.0:
+                stats["heading_err"].append(heading_error_mod180(g["yaw"], p["yaw"]))
             stats["hit_2m"] += 1
             if d <= 1.0:
                 stats["hit_1m"] += 1
@@ -233,6 +244,11 @@ def summarize(stats, acc_list, names):
     out["vehicle_yaw_err_deg"] = float(np.median(stats["yaw_err"])) if stats["yaw_err"] else None
     out["vehicle_yaw_err_deg_mean"] = float(np.mean(stats["yaw_err"])) if stats["yaw_err"] else None
     out["vel_err_mps"] = float(np.median(stats["vel_err"])) if stats["vel_err"] else None
+    out["moving_heading_err_deg"] = (
+        float(np.mean(stats["heading_err"])) if stats["heading_err"] else None
+    )
+    out["recall@1m_large"] = stats["hit_1m_large"] / max(stats["n_gt_large"], 1)
+    out["structures_per_frame"] = stats["n_structures"] / max(stats["frames"], 1)
 
     mh = mm.metrics.create()
     summary = mh.compute_many(
@@ -285,7 +301,7 @@ def main():
     cfg = load_cfg(args.cfg)
 
     stats = defaultdict(int)
-    for k in ("box_iou", "yaw_err", "vel_err"):
+    for k in ("box_iou", "yaw_err", "vel_err", "heading_err"):
         stats[k] = []
     stats["timing"] = defaultdict(list)
     stats["n_gt_cls"] = defaultdict(int)

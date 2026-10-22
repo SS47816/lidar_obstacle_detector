@@ -12,16 +12,19 @@ COLUMNS = [
     ("recall@1m", "Recall@1m", "{:.3f}"),
     ("recall@2m", "Recall@2m", "{:.3f}"),
     ("recall@iou0.3", "Recall@IoU.3", "{:.3f}"),
+    ("recall@1m_large", "Recall@1m >7m", "{:.3f}"),
     ("over_seg_rate", "Over-seg", "{:.1%}"),
     ("under_seg_rate", "Under-seg", "{:.1%}"),
     ("mean_bev_iou", "BEV IoU", "{:.3f}"),
     ("vehicle_yaw_err_deg_mean", "Yaw err [deg]", "{:.1f}"),
+    ("moving_heading_err_deg", "Moving heading err [deg]", "{:.1f}"),
     ("idf1*", "IDF1*", "{:.3f}"),
     ("mota*", "MOTA*", "{:.3f}"),
     ("id_switches", "ID sw.", "{:d}"),
     ("vel_err_mps", "Vel. err [m/s]", "{:.2f}"),
     ("ground_iou", "Ground IoU", "{:.3f}"),
     ("object_pts_lost_to_ground", "Obj. pts lost", "{:.1%}"),
+    ("structures_per_frame", "Structures / frame", "{:.1f}"),
 ]
 
 

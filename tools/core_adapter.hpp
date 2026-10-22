@@ -48,12 +48,29 @@ class CoreAdapter : public PipelineAdapter {
       ob.velocity = b.velocity.cast<double>();  // already world-aligned
       out.boxes.push_back(ob);
     }
+    for (const auto &b : res.structure_boxes) {
+      OutputBox ob;
+      ob.center = b.center.cast<double>();
+      ob.size = b.size.cast<double>();
+      ob.yaw = b.yaw;
+      out.structures.push_back(ob);
+    }
+    out.occ_resolution = res.occupancy.resolution;
+    out.occ_origin_x = res.occupancy.origin.x();
+    out.occ_origin_y = res.occupancy.origin.y();
+    out.occ_width = res.occupancy.width;
+    out.occ_height = res.occupancy.height;
+    out.occupancy = res.occupancy.data;
     out.ground = toXYZ(*res.ground);
     out.obstacles = toXYZ(*res.obstacles);
     const auto &t = res.timings;
-    out.timing_ms = {{"preprocess", t.preprocess}, {"ground", t.ground},
-                     {"cluster", t.cluster},       {"box", t.box},
-                     {"track", t.track},           {"total", t.total}};
+    out.timing_ms = {{"preprocess", t.preprocess},
+                     {"ground", t.ground},
+                     {"cluster", t.cluster},
+                     {"box", t.box},
+                     {"track", t.track},
+                     {"occupancy", t.occupancy},
+                     {"total", t.total}};
     return out;
   }
 

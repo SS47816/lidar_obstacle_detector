@@ -27,6 +27,7 @@ matplotlib = "*"
 s5cmd = "*"
 nlohmann_json = "*"
 clang-format = "19.*"
+ffmpeg = "*"
 pre-commit = "*"
 
 [feature.core.pypi-dependencies]

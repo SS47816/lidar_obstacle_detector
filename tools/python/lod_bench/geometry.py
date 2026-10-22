@@ -77,3 +77,11 @@ def orientation_error_mod90(yaw_a, yaw_b):
     rotation once length/width are allowed to swap)."""
     d = np.abs((yaw_a - yaw_b) % (np.pi / 2))
     return float(np.degrees(min(d, np.pi / 2 - d)))
+
+
+def heading_error_mod180(yaw_gt, yaw_pred):
+    """Heading error in [0, 180] deg: unlike `orientation_error_mod90`, a box pointing
+    backwards (or sideways) counts as wrong. Used for moving objects, whose direction of
+    travel is known."""
+    d = abs((yaw_gt - yaw_pred + np.pi) % (2 * np.pi) - np.pi)
+    return float(np.degrees(d))

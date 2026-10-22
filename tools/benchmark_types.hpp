@@ -37,8 +37,13 @@ struct OutputBox {
 
 struct FrameOutput {
   std::vector<OutputBox> boxes;
+  std::vector<OutputBox> structures;               // oversized clusters reported apart from objects
   std::vector<Eigen::Vector3f> ground, obstacles;  // processed clouds
   std::vector<std::pair<std::string, double>> timing_ms;
+  // 2D occupancy grid (row-major, -1/0/100), empty if not computed
+  float occ_resolution = 0.f, occ_origin_x = 0.f, occ_origin_y = 0.f;
+  int occ_width = 0, occ_height = 0;
+  std::vector<int8_t> occupancy;
 };
 
 class PipelineAdapter {

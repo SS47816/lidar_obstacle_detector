@@ -181,6 +181,12 @@ int main(int argc, char **argv) {
         boxes.push_back(jb);
       }
       rec["boxes"] = boxes;
+      json structures = json::array();
+      for (const auto &b : res.structures)
+        structures.push_back({{"center", {b.center.x(), b.center.y(), b.center.z()}},
+                              {"size", {b.size.x(), b.size.y(), b.size.z()}},
+                              {"yaw", b.yaw}});
+      rec["structures"] = structures;
       json timing = json::object();
       for (const auto &t : res.timing_ms) timing[t.first] = t.second;
       rec["timing_ms"] = timing;
@@ -190,6 +196,16 @@ int main(int argc, char **argv) {
           dumpCloud(out_dir + "/clouds/" + name.str() + "_ground.bin", res.ground);
           dumpCloud(out_dir + "/clouds/" + name.str() + "_obstacle.bin", res.obstacles);
           rec["dumped"] = true;
+          if (!res.occupancy.empty()) {
+            std::ofstream occ(out_dir + "/clouds/" + name.str() + "_occupancy.bin",
+                              std::ios::binary);
+            occ.write(reinterpret_cast<const char *>(res.occupancy.data()),
+                      static_cast<std::streamsize>(res.occupancy.size()));
+            rec["occupancy"] = {{"resolution", res.occ_resolution},
+                                {"origin", {res.occ_origin_x, res.occ_origin_y}},
+                                {"width", res.occ_width},
+                                {"height", res.occ_height}};
+          }
         }
         ++annotated;
       }
