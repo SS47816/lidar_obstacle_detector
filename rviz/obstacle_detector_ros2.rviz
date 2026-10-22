@@ -1,0 +1,69 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 10
+      Plane Cell Count: 20
+      Color: 160; 160; 164
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Ground
+      Enabled: true
+      Topic:
+        Value: /obstacle_detector/cloud_ground
+        Reliability Policy: Best Effort
+        Depth: 5
+      Color Transformer: FlatColor
+      Color: 120; 120; 120
+      Size (m): 0.05
+      Style: Points
+      Size (Pixels): 2
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Obstacles
+      Enabled: true
+      Topic:
+        Value: /obstacle_detector/cloud_obstacles
+        Reliability Policy: Best Effort
+        Depth: 5
+      Color Transformer: FlatColor
+      Color: 255; 200; 0
+      Size (m): 0.05
+      Style: Points
+      Size (Pixels): 3
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Obstacles (boxes, ids, velocity)
+      Enabled: true
+      Topic:
+        Value: /obstacle_detector/markers
+        Depth: 5
+  Enabled: true
+  Global Options:
+    Background Color: 30; 30; 30
+    Fixed Frame: velodyne
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 60
+      Focal Point:
+        X: 10
+        Y: 0
+        Z: 0
+      Pitch: 0.8
+      Yaw: 3.14
+      Target Frame: <Fixed Frame>
+Window Geometry:
+  Height: 900
+  Width: 1400
