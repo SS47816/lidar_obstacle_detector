@@ -1,5 +1,5 @@
 fail_fast: false
-exclude: ^(third_party|legacy)/
+exclude: ^third_party/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
