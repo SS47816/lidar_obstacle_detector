@@ -58,7 +58,7 @@ class DisjointSet {
 
 }  // namespace detail
 
-// Fixed-radius Euclidean clustering (PCL), as in v1
+// Fixed-radius Euclidean clustering (PCL)
 template <typename PointT>
 std::vector<pcl::Indices> euclideanClustering(
     const typename pcl::PointCloud<PointT>::ConstPtr &cloud, const ClusterConfig &cfg) {

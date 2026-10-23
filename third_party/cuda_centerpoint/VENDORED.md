@@ -21,3 +21,5 @@ Local changes:
 - `src/centerpoint.cpp`, `include/centerpoint.h`: model directory and engine plan path are
   arguments; uses the current libspconv API (`input()->features().reference(...)`,
   `forward(stream)`); throws instead of `abort()` when a model fails to load.
+- `src/preprocess.cpp`: the voxel count is clamped to `max_voxels` (dense multi-sweep input
+  otherwise makes feature extraction read past its buffers).

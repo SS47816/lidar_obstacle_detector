@@ -18,7 +18,7 @@ namespace lidar_obstacle_detector {
 PipelineConfig PipelineConfig::preset(const std::string &name) {
   PipelineConfig c;
   if (name == "legacy") {
-    // v1 defaults: unconstrained RANSAC, fixed-radius clustering, axis-aligned boxes
+    // Classic pipeline: unconstrained RANSAC, fixed-radius clustering, axis-aligned boxes
     c.ground.max_iterations = 30;
     c.ground.max_slope_deg = 90.f;
     c.cluster.method = ClusterMethod::kEuclidean;
@@ -123,10 +123,12 @@ Entry boolean(const std::string &name, const std::string &desc,
       [info, field](PipelineConfig &c, const std::string &s) { field(c) = parseBool(info, s); }};
 }
 
+// `aliases` are accepted when setting (e.g. old names) but never reported
 template <typename E>
 Entry choice(const std::string &name, const std::string &desc,
              const std::vector<std::pair<std::string, E>> &options,
-             std::function<E &(PipelineConfig &)> field) {
+             std::function<E &(PipelineConfig &)> field,
+             const std::vector<std::pair<std::string, E>> &aliases = {}) {
   ParamInfo info{name, ParamInfo::Type::kString, desc, 0, 0, {}};
   for (const auto &o : options) info.choices.push_back(o.first);
   return {info,
@@ -136,11 +138,13 @@ Entry choice(const std::string &name, const std::string &desc,
               if (o.second == v) return o.first;
             return std::string();
           },
-          [info, options, field](PipelineConfig &c, const std::string &s) {
-            for (const auto &o : options) {
-              if (o.first == s) {
-                field(c) = o.second;
-                return;
+          [info, options, aliases, field](PipelineConfig &c, const std::string &s) {
+            for (const auto *list : {&options, &aliases}) {
+              for (const auto &o : *list) {
+                if (o.first == s) {
+                  field(c) = o.second;
+                  return;
+                }
               }
             }
             std::string allowed;
@@ -162,14 +166,20 @@ const std::vector<Entry> &entries() {
       // --- detector ---
       choice<DetectorMethod>(
           "detector_method",
-          "Detector: clustering | centerpoint | hybrid (centerpoint and hybrid need "
-          "a TensorRT build)",
+          "Detector: clustering | learning | fused (learning and fused need a TensorRT build)",
           {{"clustering", DetectorMethod::kClustering},
-           {"centerpoint", DetectorMethod::kCenterPoint},
-           {"hybrid", DetectorMethod::kHybrid}},
-          [](C &c) -> DetectorMethod & { return c.detector.method; }),
+           {"learning", DetectorMethod::kLearning},
+           {"fused", DetectorMethod::kFused}},
+          [](C &c) -> DetectorMethod & { return c.detector.method; },
+          {{"centerpoint", DetectorMethod::kLearning}, {"hybrid", DetectorMethod::kFused}}),
       real("detector_score_threshold", "Min score of learned detections", 0, 1,
            [](C &c) -> float & { return c.detector.score_threshold; }),
+      integer("detector_sweeps", "Scans accumulated as network input (needs tracking_frame)", 1, 20,
+              [](C &c) -> int & { return c.detector.sweeps; }),
+      real("fused_margin", "fused: growth of learned boxes when absorbing clusters [m]", 0, 3,
+           [](C &c) -> float & { return c.detector.fused_margin; }),
+      real("fused_min_overlap", "fused: fraction of a cluster inside a learned box to absorb it", 0,
+           1, [](C &c) -> float & { return c.detector.fused_min_overlap; }),
       text("detector_model_dir", "Directory of the learned detector models (\"\" = built-in)",
            [](C &c) -> std::string & { return c.detector.model_dir; }),
       text("detector_engine_cache", "Directory for TensorRT engine caches (\"\" = ~/.cache)",
@@ -204,10 +214,10 @@ const std::vector<Entry> &entries() {
       real("ego_max_z", "Ego box max z [m]", -10, 10,
            [](C &c) -> float & { return c.preprocess.ego_max.z(); }),
       // --- ground segmentation ---
-      choice<GroundMethod>("ground_method", "Ground segmentation: ransac | patchworkpp",
-                           {{"ransac", GroundMethod::kRansac},
-                            {"patchworkpp", GroundMethod::kPatchworkpp}},
-                           [](C &c) -> GroundMethod & { return c.ground.method; }),
+      choice<GroundMethod>(
+          "ground_method", "Ground segmentation: ransac | patchworkpp",
+          {{"ransac", GroundMethod::kRansac}, {"patchworkpp", GroundMethod::kPatchworkpp}},
+          [](C &c) -> GroundMethod & { return c.ground.method; }),
       real("ground_threshold", "RANSAC plane distance threshold [m]", 0, 2,
            [](C &c) -> float & { return c.ground.distance_threshold; }),
       integer("ground_max_iterations", "RANSAC iterations", 1, 10000,
@@ -243,6 +253,11 @@ const std::vector<Entry> &entries() {
            [](C &c) -> float & { return c.cluster.object_max_length; }),
       real("object_max_width", "Wider clusters are split or become structures [m]", 0.5, 50,
            [](C &c) -> float & { return c.cluster.object_max_width; }),
+      boolean("cluster_track_guided",
+              "Re-join / separate clusters using the predicted footprints of vehicle tracks",
+              [](C &c) -> bool & { return c.cluster.track_guided; }),
+      real("cluster_track_guided_margin", "Growth of the predicted track footprints [m]", 0, 2,
+           [](C &c) -> float & { return c.cluster.track_guided_margin; }),
       integer("cluster_min_size", "Min points per cluster", 1, 100000,
               [](C &c) -> int & { return c.cluster.min_size; }),
       integer("cluster_max_size", "Max points per cluster", 1, 10000000,
@@ -281,8 +296,13 @@ const std::vector<Entry> &entries() {
            [](C &c) -> float & { return c.tracker.heading_min_speed; }),
       boolean("track_shape_completion", "Keep the track's full size for partially visible objects",
               [](C &c) -> bool & { return c.tracker.shape_completion; }),
+      real("prediction_horizon", "Predicted path length [s], 0 = off", 0, 10,
+           [](C &c) -> float & { return c.tracker.prediction_horizon; }),
+      real("prediction_step", "Time between predicted poses [s]", 0.05, 2,
+           [](C &c) -> float & { return c.tracker.prediction_step; }),
       // --- occupancy ---
-      boolean("occupancy_enabled", "Compute the 2D occupancy grid and 3D occupied voxels",
+      boolean("occupancy_enabled",
+              "Compute the 2.5D pillars, the 2D occupancy grid and 3D occupied voxels",
               [](C &c) -> bool & { return c.occupancy.enabled; }),
       real("occupancy_resolution", "2D occupancy grid cell size [m]", 0.05, 2,
            [](C &c) -> float & { return c.occupancy.resolution; }),
@@ -292,6 +312,8 @@ const std::vector<Entry> &entries() {
            [](C &c) -> float & { return c.occupancy.max_height; }),
       real("occupancy_voxel_size", "3D occupied voxel size [m]", 0.05, 2,
            [](C &c) -> float & { return c.occupancy.voxel_size; }),
+      real("pillar_memory", "Fuse pillars over this many seconds (needs tracking_frame), 0 = off",
+           0, 10, [](C &c) -> float & { return c.occupancy.pillar_memory; }),
   };
   return table;
 }

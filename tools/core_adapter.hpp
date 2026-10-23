@@ -2,7 +2,7 @@
 
  * Copyright (C) 2021-2026 SS47816
 
- * Runs the v2 core pipeline inside the benchmark CLI
+ * Runs the pipeline inside the benchmark CLI
 
 **/
 
@@ -48,6 +48,7 @@ class CoreAdapter : public PipelineAdapter {
       ob.velocity = b.velocity.cast<double>();  // already world-aligned
       ob.label = objectClassName(b.label);
       ob.score = b.score;
+      for (const auto &p : b.predicted_path) ob.path.push_back(p.position.head<2>().cast<double>());
       out.boxes.push_back(ob);
     }
     for (const auto &b : res.structure_boxes) {
@@ -63,6 +64,9 @@ class CoreAdapter : public PipelineAdapter {
     out.occ_width = res.occupancy.width;
     out.occ_height = res.occupancy.height;
     out.occupancy = res.occupancy.data;
+    out.pillars.reserve(res.pillars.size());
+    for (const auto &p : res.pillars)
+      out.pillars.push_back({p.center.x(), p.center.y(), p.z_min, p.z_max, p.observed ? 1.f : 0.f});
     out.ground = toXYZ(*res.ground);
     out.obstacles = toXYZ(*res.obstacles);
     const auto &t = res.timings;

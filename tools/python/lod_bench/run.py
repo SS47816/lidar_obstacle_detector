@@ -1,7 +1,7 @@
 """Run lod_benchmark over every sequence of a benchmark dataset, then evaluate.
 
     python -I run.py --data ~/datasets/lod_bench/nuscenes --runs ~/datasets/lod_bench/runs \
-        --name fast --pipeline v2 --preset fast [--set key=value ...] [--jobs 1]
+        --name fast --preset fast [--set key=value ...] [--jobs 1]
 
 Use --jobs 1 (default) for runtime numbers; parallel jobs distort per-frame timings.
 """
@@ -22,7 +22,6 @@ def main():
     ap.add_argument("--data", required=True)
     ap.add_argument("--runs", required=True)
     ap.add_argument("--name", required=True)
-    ap.add_argument("--pipeline", default="v2")
     ap.add_argument("--preset", default="fast")
     ap.add_argument("--set", action="append", default=[])
     ap.add_argument("--jobs", type=int, default=1)
@@ -43,8 +42,6 @@ def main():
             seq,
             "--out",
             os.path.join(run_dir, os.path.basename(seq)),
-            "--pipeline",
-            args.pipeline,
             "--preset",
             args.preset,
             "--config",

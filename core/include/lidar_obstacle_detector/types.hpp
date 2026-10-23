@@ -32,6 +32,13 @@ enum class ObjectClass : uint8_t {
 };
 const char *objectClassName(ObjectClass c);
 
+// A future pose of a tracked object
+struct PredictedPose {
+  float t = 0.f;  // [s] ahead of the box's timestamp
+  Eigen::Vector3f position = Eigen::Vector3f::Zero();
+  float yaw = 0.f;  // direction of travel
+};
+
 // An upright 3D bounding box (rotation about z only), as produced by the box
 // fitting stage and refined by the tracker.
 struct Box {
@@ -50,6 +57,9 @@ struct Box {
   bool heading_known = false;
   ObjectClass label = ObjectClass::kUnknown;
   float score = 1.f;  // detection confidence (1 for clustering)
+  // Constant turn rate and velocity prediction (moving, confirmed tracks only),
+  // in the same frame as `center`
+  std::vector<PredictedPose> predicted_path;
 
   Box() = default;
   Box(uint32_t id, const Eigen::Vector3f &center, const Eigen::Vector3f &size, float yaw = 0.f)
@@ -58,6 +68,15 @@ struct Box {
   Eigen::Quaternionf orientation() const {
     return Eigen::Quaternionf(Eigen::AngleAxisf(yaw, Eigen::Vector3f::UnitZ()));
   }
+};
+
+// One cell of the 2.5D obstacle map: a column from the local ground up to the
+// highest obstacle point, for everything that is not a recognised object
+struct Pillar {
+  Eigen::Vector2f center = Eigen::Vector2f::Zero();  // cell centre, sensor frame
+  float z_min = 0.f;                                 // local ground height
+  float z_max = 0.f;                                 // top of the obstacle
+  bool observed = true;  // seen in this scan (false: remembered from earlier scans)
 };
 
 // Wall-clock time [ms] spent in each pipeline stage for the last frame

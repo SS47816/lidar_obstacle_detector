@@ -37,7 +37,7 @@ class GroundSegmenter {
 
 // Single ground plane fitted with RANSAC. The plane normal is constrained to
 // be within `max_slope_deg` of the z axis, so walls and vehicle sides cannot be
-// picked as "ground" (90 deg reproduces the unconstrained v1 behaviour).
+// picked as "ground" (90 deg = unconstrained).
 template <typename PointT>
 class RansacGroundSegmenter : public GroundSegmenter<PointT> {
  public:

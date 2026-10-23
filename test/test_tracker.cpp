@@ -43,7 +43,7 @@ TEST(Tracker, NewDetectionsGetFreshIdsAndAreAllKept) {
 }
 
 TEST(Tracker, PicksTheNearestTrackNotTheFirst) {
-  // v1's unweighted matching could swap these
+  // greedy / unweighted matching could swap these
   MultiObjectTracker tracker;
   std::vector<Box> a{det(0, 0, 0, 1, 1), det(1.5f, 0, 0, 1, 1)};
   tracker.update(0.0, &a);
@@ -163,4 +163,41 @@ TEST(Tracker, ShapeCompletionKeepsFullSizeOfPartialView) {
   std::vector<Box> raw{det(10.75f, 0.f, 0.f, 1.5f, 1.8f)};
   plain.update(0.8, &raw);
   EXPECT_NEAR(raw[0].size.x(), 1.5f, 1e-4);
+}
+
+TEST(Tracker, PredictsTurningTargetWithConstantTurnRate) {
+  // 10 m/s on a circle of radius 40 m (0.25 rad/s), detections every 0.1 s
+  constexpr float kSpeed = 10.f, kRadius = 40.f, kRate = kSpeed / kRadius;
+  auto pos = [&](float t) {
+    return Eigen::Vector2f(kRadius * std::sin(kRate * t), kRadius * (1.f - std::cos(kRate * t)));
+  };
+  MultiObjectTracker tracker;
+  std::vector<Box> boxes;
+  float t = 0.f;
+  for (int k = 0; k < 40; ++k) {
+    t = 0.1f * k;
+    const Eigen::Vector2f p = pos(t);
+    boxes = {det(p.x(), p.y(), kRate * t)};
+    tracker.update(t, &boxes);
+  }
+  const auto &path = boxes[0].predicted_path;
+  ASSERT_EQ(path.size(), 6u);  // 3 s at 0.5 s
+  EXPECT_NEAR(path.back().t, 3.f, 1e-4);
+  const Eigen::Vector2f truth = pos(t + 3.f);
+  // vs. extrapolating the same filtered velocity in a straight line
+  const Eigen::Vector2f straight = boxes[0].center.head<2>() + 3.f * boxes[0].velocity;
+  const float err = (path.back().position.head<2>() - truth).norm();
+  EXPECT_LT(err, 4.f);
+  EXPECT_LT(err, 0.4f * (straight - truth).norm());
+}
+
+TEST(Tracker, NoPredictionForStationaryObjects) {
+  MultiObjectTracker tracker;
+  std::vector<Box> boxes;
+  for (int k = 0; k < 10; ++k) {
+    boxes = {det(5.f, 5.f)};
+    tracker.update(0.1 * k, &boxes);
+  }
+  EXPECT_TRUE(boxes[0].tracked);
+  EXPECT_TRUE(boxes[0].predicted_path.empty());
 }

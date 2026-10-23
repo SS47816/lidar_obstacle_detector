@@ -19,10 +19,7 @@
 #include <vector>
 
 #include "benchmark_types.hpp"
-#include "legacy_adapter.hpp"
-#ifdef LOD_HAVE_CORE
 #include "core_adapter.hpp"
-#endif
 
 namespace lod = lidar_obstacle_detector::bench;
 using json = nlohmann::json;
@@ -31,9 +28,7 @@ namespace {
 
 void usage() {
   std::cerr << "Usage: lod_benchmark --seq DIR --out DIR [options]\n"
-               "  --pipeline legacy|v2   pipeline to run (default v2)\n"
-               "  --preset NAME          v2 preset: legacy|fast|accurate (default "
-               "fast)\n"
+               "  --preset NAME          preset: legacy|fast|accurate (default fast)\n"
                "  --config FILE          key=value parameter file (# comments)\n"
                "  --set key=value        parameter override (repeatable)\n"
                "  --dump-every N         dump processed clouds every N-th annotated "
@@ -96,7 +91,7 @@ void dumpCloud(const std::string &path, const std::vector<Eigen::Vector3f> &pts)
 }  // namespace
 
 int main(int argc, char **argv) {
-  std::string seq_dir, out_dir, pipeline = "v2", preset = "fast";
+  std::string seq_dir, out_dir, preset = "fast";
   int dump_every = 0;
   long max_frames = -1;
   lod::ParamMap params;
@@ -111,8 +106,6 @@ int main(int argc, char **argv) {
         seq_dir = next();
       else if (a == "--out")
         out_dir = next();
-      else if (a == "--pipeline")
-        pipeline = next();
       else if (a == "--preset")
         preset = next();
       else if (a == "--config")
@@ -134,16 +127,7 @@ int main(int argc, char **argv) {
       return 2;
     }
 
-    std::unique_ptr<lod::PipelineAdapter> adapter;
-    if (pipeline == "legacy") {
-      adapter = std::make_unique<lod::LegacyAdapter>(params);
-#ifdef LOD_HAVE_CORE
-    } else if (pipeline == "v2") {
-      adapter = std::make_unique<lod::CoreAdapter>(preset, params);
-#endif
-    } else {
-      throw std::invalid_argument("unknown pipeline " + pipeline);
-    }
+    auto adapter = std::make_unique<lod::CoreAdapter>(preset, params);
 
     if (std::system(("mkdir -p '" + out_dir + "/clouds'").c_str()) != 0)
       throw std::runtime_error("cannot create " + out_dir);
@@ -180,6 +164,11 @@ int main(int argc, char **argv) {
         if (b.has_velocity) jb["velocity"] = {b.velocity.x(), b.velocity.y()};
         jb["label"] = b.label;
         jb["score"] = b.score;
+        if (!b.path.empty()) {
+          json path = json::array();
+          for (const auto &p : b.path) path.push_back({p.x(), p.y()});
+          jb["path"] = path;
+        }
         boxes.push_back(jb);
       }
       rec["boxes"] = boxes;
@@ -194,6 +183,18 @@ int main(int argc, char **argv) {
       rec["timing_ms"] = timing;
 
       if (f["annotated"].get<bool>()) {
+        // Pillars of every annotated frame (int16: x, y, z_min, z_max [cm], observed)
+        if (!res.pillars.empty()) {
+          std::vector<int16_t> buf;
+          buf.reserve(res.pillars.size() * 5);
+          for (const auto &p : res.pillars)
+            for (int k = 0; k < 5; ++k)
+              buf.push_back(static_cast<int16_t>(std::lround(k < 4 ? 100.f * p[k] : p[k])));
+          std::ofstream pf(out_dir + "/clouds/" + name.str() + "_pillars.bin", std::ios::binary);
+          pf.write(reinterpret_cast<const char *>(buf.data()),
+                   static_cast<std::streamsize>(buf.size() * sizeof(int16_t)));
+          rec["pillars"] = res.pillars.size();
+        }
         if (dump_every > 0 && annotated % dump_every == 0) {
           dumpCloud(out_dir + "/clouds/" + name.str() + "_ground.bin", res.ground);
           dumpCloud(out_dir + "/clouds/" + name.str() + "_obstacle.bin", res.obstacles);

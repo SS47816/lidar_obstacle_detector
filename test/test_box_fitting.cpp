@@ -110,7 +110,7 @@ TEST(BoxFitting, PcaOnFullRectangleOutline) {
   EXPECT_LT(yawErrorMod90(box.yaw, yaw), 1.f);
   EXPECT_NEAR(box.size.x(), 4.f, 0.05f);
   EXPECT_NEAR(box.size.y(), 1.6f, 0.05f);
-  EXPECT_NEAR(box.center.z(), 0.5f, 1e-5);  // v1 used the centroid z instead
+  EXPECT_NEAR(box.center.z(), 0.5f, 1e-5);  // the extent centre, not the centroid
 }
 
 TEST(BoxFitting, TinyClustersFallBackGracefully) {

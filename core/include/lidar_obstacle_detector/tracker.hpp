@@ -3,7 +3,8 @@
  * Copyright (C) 2021-2026 SS47816
 
  * Multi-object tracker: constant-velocity Kalman filter per track, optimal
- * (Hungarian) association on centre distance or BEV GIoU, track lifecycle.
+ * (Hungarian) association on centre distance or BEV GIoU, track lifecycle and
+ * constant turn rate and velocity (CTRV) path prediction.
 
 **/
 
@@ -37,6 +38,10 @@ class MultiObjectTracker {
   void reset();
   size_t numTracks() const { return tracks_.size(); }
 
+  // Footprints of the confirmed tracks at least `min_length` long, predicted to
+  // `stamp` (tracking frame, box id = track id)
+  std::vector<Box> predictedFootprints(double stamp, float min_length) const;
+
  private:
   struct Track {
     uint32_t id;
@@ -51,6 +56,8 @@ class MultiObjectTracker {
     float motion_heading;  // last velocity heading, for the consistency check
     int heading_streak;    // consecutive frames with a consistent velocity heading
     ObjectClass label;     // last class reported by a learned detector
+    float vel_heading;     // velocity direction at the last update
+    float yaw_rate;        // smoothed turn rate [rad/s], for prediction
   };
 
   void predict(Track *t, float dt) const;
@@ -59,6 +66,8 @@ class MultiObjectTracker {
   void completeShape(const Track &t, const Eigen::Vector2f &sensor_xy, Box *det) const;
   void correct(Track *t, Box *det, double stamp, const Eigen::Vector2f &sensor_xy) const;
   Track spawn(const Box &det, double stamp);
+  void updateTurnRate(Track *t, float dt) const;
+  void predictPath(const Track &t, Box *det) const;
 
   TrackerConfig cfg_;
   std::vector<Track> tracks_;

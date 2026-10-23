@@ -1,0 +1,45 @@
+name: Bug report
+description: Something does not build, crashes or detects the wrong thing
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report this! The more of the fields below you fill in, the faster it gets fixed.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead? Screenshots of RViz / Foxglove help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Launch command, parameters you changed, and if possible a short bag (or a public dataset sequence).
+      placeholder: |
+        ros2 launch lidar_obstacle_detector obstacle_detector.launch.py points:=/velodyne_points preset:=fast
+    validations:
+      required: true
+  - type: dropdown
+    id: ros
+    attributes:
+      label: ROS version
+      options: [ROS 2 Jazzy, ROS 2 Humble, ROS 1 Noetic, no ROS (C++ library / pixi), other]
+    validations:
+      required: true
+  - type: dropdown
+    id: detector
+    attributes:
+      label: Detector
+      options: [clustering (default), learning (CenterPoint), fused]
+  - type: input
+    id: lidar
+    attributes:
+      label: Lidar and mounting height
+      placeholder: e.g. Ouster OS1-64, 1.9 m above the ground
+  - type: textarea
+    id: logs
+    attributes:
+      label: Build / runtime log
+      render: shell

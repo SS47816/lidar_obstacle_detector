@@ -90,18 +90,19 @@ class CenterPointDetector : public LearnedDetector {
 
   std::string name() const override { return "centerpoint"; }
 
-  std::vector<Box> detect(const std::vector<Eigen::Vector4f> &points) override {
-    // Sensor frame (x forward, y left) -> nuScenes lidar frame (x right, y forward)
+  std::vector<Box> detect(const std::vector<SweepPoint> &points) override {
+    // Sensor frame (x forward, y left) -> nuScenes lidar frame (x right, y forward).
+    // Points come newest first, so the cap drops the oldest scans.
     const size_t n = std::min<size_t>(points.size(), MAX_POINTS_NUM);
     host_.resize(n * kFeatures);
     for (size_t i = 0; i < n; ++i) {
       const auto &p = points[i];
       float *h = &host_[i * kFeatures];
-      h[0] = -p.y();
-      h[1] = p.x();
-      h[2] = p.z() + z_offset_;
-      h[3] = p.w();
-      h[4] = 0.f;  // single sweep: time lag 0
+      h[0] = -p.y;
+      h[1] = p.x;
+      h[2] = p.z + z_offset_;
+      h[3] = p.intensity;
+      h[4] = p.time_lag;
     }
     cudaMemcpyAsync(d_points_, host_.data(), host_.size() * sizeof(float), cudaMemcpyHostToDevice,
                     stream_);

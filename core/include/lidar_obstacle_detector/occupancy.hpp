@@ -3,7 +3,8 @@
  * Copyright (C) 2021-2026 SS47816
 
  * Occupancy outputs: a 2D bird's-eye grid with free / occupied / unknown cells
- * (free space by ray casting from the sensor) and 3D occupied voxels
+ * (free space by ray casting from the sensor), 3D occupied voxels and 2.5D
+ * obstacle pillars fused over time
 
 **/
 
@@ -12,13 +13,14 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 
-#include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <cstdint>
 #include <vector>
 
 #include "lidar_obstacle_detector/config.hpp"
 #include "lidar_obstacle_detector/ground_segmentation.hpp"
 #include "lidar_obstacle_detector/preprocess.hpp"
+#include "lidar_obstacle_detector/types.hpp"
 
 namespace lidar_obstacle_detector {
 
@@ -65,14 +67,55 @@ class OccupancyMapper {
   std::vector<float> cell_range_;
 };
 
+// 2.5D pillars: per-scan obstacle columns accumulated in a fixed frame with
+// log-odds evidence. Cells hit in this scan are always reported; remembered
+// cells fade when the sensor sees free space through them, slowly when they
+// are occluded, and at once when a recognised object now covers them.
+class PillarMapper {
+ public:
+  // `samples`: x, y, local ground z, point z of obstacle points, in the
+  // tracking frame. `grid` (sensor frame) tells which cells are seen free.
+  // `objects`: boxes in the sensor frame whose area is not a pillar.
+  // `memory` [s] <= 0 reports this scan only. Pillars are written in the
+  // sensor frame.
+  void update(const std::vector<Eigen::Vector4f> &samples, const OccupancyGrid2D &grid,
+              const std::vector<Box> &objects, const Eigen::Isometry3f &tracking_T_sensor,
+              double stamp, float resolution, float memory, std::vector<Pillar> *pillars);
+  void reset() { cells_.clear(); }
+  size_t size() const { return cells_.size(); }
+
+ private:
+  struct Cell {
+    int64_t key = 0;  // packed cell indices in the tracking frame
+    float log_odds = 0.f;
+    float z_min = 0.f, z_max = 0.f;
+    float scan_min = 0.f, scan_max = 0.f;  // column of this scan
+    bool hit = false;                      // in this scan
+  };
+  // Cells live in a vector, found through an open-addressing index that is
+  // rebuilt every scan (cheaper than a node-based hash map at this size)
+  Cell &find(int64_t key);
+  void reindex();
+
+  std::vector<Cell> cells_;
+  std::vector<int32_t> index_;  // into cells_, -1 = empty slot
+  float resolution_ = 0.f;
+  double last_stamp_ = 0.0;
+};
+
 // Computes the occupancy outputs for one scan. Obstacle points count as
 // occupied when they lie between min_height and max_height above the local
 // ground (so overhanging branches and the ground itself are ignored).
+// `pillar_samples` (optional) receives x, y, local ground z and z (sensor frame)
+// of the occupied points that `pillar_mask` (per obstacle point, null = all)
+// selects for the pillar map.
 template <typename PointT>
 void computeOccupancy(const pcl::PointCloud<PointT> &ground,
                       const pcl::PointCloud<PointT> &obstacles, const PreprocessConfig &roi,
                       const OccupancyConfig &cfg, OccupancyMapper *mapper, OccupancyGrid2D *grid,
-                      pcl::PointCloud<PointT> *voxels) {
+                      pcl::PointCloud<PointT> *voxels,
+                      const std::vector<uint8_t> *pillar_mask = nullptr,
+                      std::vector<Eigen::Vector4f> *pillar_samples = nullptr) {
   // Local ground height over the ROI
   pcl::PointCloud<PointT> bounds_and_ground = ground;
   PointT lo, hi;
@@ -93,7 +136,9 @@ void computeOccupancy(const pcl::PointCloud<PointT> &ground,
   band.reserve(obstacles.size());
   std::vector<Eigen::Vector2f> occupied, observed_ground;
   occupied.reserve(obstacles.size());
-  for (const auto &p : obstacles.points) {
+  if (pillar_samples) pillar_samples->clear();
+  for (size_t i = 0; i < obstacles.size(); ++i) {
+    const PointT &p = obstacles.points[i];
     float h;
     if (!height_map.height(p.x, p.y, &h)) {
       if (!have_fallback) continue;
@@ -103,6 +148,8 @@ void computeOccupancy(const pcl::PointCloud<PointT> &ground,
     if (above < cfg.min_height || above > cfg.max_height) continue;
     band.push_back(p);
     occupied.emplace_back(p.x, p.y);
+    if (pillar_samples && (!pillar_mask || (*pillar_mask)[i]))
+      pillar_samples->emplace_back(p.x, p.y, h, p.z);
   }
   observed_ground.reserve(ground.size());
   for (const auto &p : ground.points) observed_ground.emplace_back(p.x, p.y);

@@ -27,3 +27,13 @@
     ego_max_z: -0.4
 
     sensor_height: 1.73       # lidar height above the ground (Patchwork++)
+
+    # Detector: clustering (CPU, every obstacle is a tracked box) | learning (CenterPoint
+    # objects only) | fused (CenterPoint objects + 2.5D pillars for everything else).
+    # learning and fused need a build with -DLOD_WITH_TENSORRT=ON.
+    # detector_method: fused
+    # detector_sweeps: 10       # scans fed to the network (needs tracking_frame)
+
+    # occupancy_enabled: true   # 2.5D pillars, 2D occupancy grid, 3D voxels (fast / accurate)
+    # pillar_memory: 2.0        # [s] fuse pillars over time (needs tracking_frame)
+    # prediction_horizon: 3.0   # [s] predicted paths of moving tracks (0 = off)

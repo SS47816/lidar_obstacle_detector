@@ -18,7 +18,7 @@ jobs:
       - uses: jidicula/clang-format-action@v4.15.0
         with:
           clang-format-version: "19"
-          exclude-regex: "(third_party|legacy)/"
+          exclude-regex: "third_party/"
 
   core:
     name: core (${{ matrix.name }})

@@ -22,6 +22,7 @@
  */
  
 #include "preprocess.h"
+#include <algorithm>
 #include <assert.h>
 #include <iostream>
 
@@ -100,6 +101,9 @@ int PreProcessCuda::generateVoxels(const float *points, size_t points_size, cuda
     d_real_num_voxels_, stream));
     checkCudaErrors(cudaMemcpyAsync(h_real_num_voxels_, d_real_num_voxels_, sizeof(int), cudaMemcpyDeviceToHost, stream));
     checkCudaErrors(cudaStreamSynchronize(stream));
+    // lidar_obstacle_detector: points beyond max_voxels are dropped by the kernel, but the
+    // count is not capped; clamp it so feature extraction stays inside the buffers
+    *h_real_num_voxels_ = std::min(*h_real_num_voxels_, params_.max_voxels);
 
     checkCudaErrors(featureExtractionLaunch(voxels_temp_, d_voxel_num_,
           *h_real_num_voxels_, params_.max_points_per_voxel, params_.feature_num,

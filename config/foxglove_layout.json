@@ -1,0 +1,68 @@
+{
+  "configById": {
+    "3D!lod": {
+      "cameraState": {
+        "distance": 48,
+        "perspective": true,
+        "phi": 52,
+        "thetaOffset": -90,
+        "targetOffset": [10, 0, 0],
+        "target": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "lidar",
+      "scene": { "backgroundColor": "#0a0e16", "enableStats": false },
+      "transforms": {},
+      "topics": {
+        "/points": { "visible": false },
+        "/obstacle_detector/cloud_ground": {
+          "visible": true, "colorMode": "flat", "flatColor": "#0f5c66", "pointSize": 2
+        },
+        "/obstacle_detector/cloud_obstacles": {
+          "visible": true, "colorMode": "flat", "flatColor": "#c8ccd4", "pointSize": 2
+        },
+        "/obstacle_detector/markers": { "visible": true },
+        "/obstacle_detector/occupancy": { "visible": false },
+        "/obstacle_detector/pillars": { "visible": false }
+      },
+      "layers": {
+        "grid": {
+          "visible": true, "frameLocked": true, "label": "Grid", "instanceId": "grid",
+          "layerId": "foxglove.Grid", "size": 80, "divisions": 16, "lineWidth": 1,
+          "color": "#24314a", "position": [0, 0, -1.8], "rotation": [0, 0, 0]
+        }
+      },
+      "publish": { "type": "point", "pointTopic": "/clicked_point" },
+      "imageMode": {}
+    },
+    "Image!cam": {
+      "cameraState": { "distance": 20, "perspective": true, "phi": 60, "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0], "targetOrientation": [0, 0, 0, 1], "thetaOffset": 45,
+        "fovy": 45, "near": 0.5, "far": 5000 },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": { "type": "point" },
+      "imageMode": { "imageTopic": "/camera/image/compressed" }
+    },
+    "RawMessages!det": {
+      "diffEnabled": false, "diffMethod": "custom", "diffTopicPath": "", "showFullMessageForDiff": false,
+      "topicPath": "/obstacle_detector/detections.detections"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": { "speed": 1 },
+  "layout": {
+    "first": "3D!lod",
+    "second": { "first": "Image!cam", "second": "RawMessages!det", "direction": "column", "splitPercentage": 45 },
+    "direction": "row",
+    "splitPercentage": 66
+  }
+}

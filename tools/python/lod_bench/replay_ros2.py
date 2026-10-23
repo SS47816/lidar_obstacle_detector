@@ -6,7 +6,9 @@ Useful to try the ROS 2 node on AV2 / nuScenes data without converting bags:
     ros2 launch lidar_obstacle_detector obstacle_detector.launch.py points:=/points \
         tracking_frame:=odom
 
-Messages are stamped with the current time; the TF is published alongside each cloud.
+Messages are stamped with the current time; the TF is published alongside each cloud. With a
+camera.jsonl in the sequence (prepare_av2.py --with-camera), the front camera is published as
+`/camera/image/compressed` too.
 """
 
 import argparse
@@ -18,7 +20,7 @@ import numpy as np
 import rclpy
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
-from sensor_msgs.msg import PointCloud2, PointField
+from sensor_msgs.msg import CompressedImage, PointCloud2, PointField
 from tf2_ros import TransformBroadcaster
 
 
@@ -38,6 +40,12 @@ class Replayer(Node):
             self.frames = [json.loads(line) for line in f]
         self.pub = self.create_publisher(PointCloud2, args.topic, 5)
         self.tf = TransformBroadcaster(self)
+        self.camera = {}
+        cam_path = os.path.join(args.seq, "camera.jsonl")
+        if os.path.exists(cam_path):
+            with open(cam_path) as f:
+                self.camera = {r["idx"]: r for r in map(json.loads, f)}
+            self.pub_image = self.create_publisher(CompressedImage, "/camera/image/compressed", 5)
         self.origin = np.asarray(self.frames[0]["pose"]).reshape(4, 4)[:3, 3].copy()
 
     def cloud_msg(self, idx, stamp):
@@ -84,6 +92,15 @@ class Replayer(Node):
             stamp = self.get_clock().now().to_msg()
             self.tf.sendTransform(self.tf_msg(np.asarray(fr["pose"]).reshape(4, 4), stamp))
             self.pub.publish(self.cloud_msg(fr["idx"], stamp))
+            cam = self.camera.get(fr["idx"])
+            if cam is not None:
+                img = CompressedImage()
+                img.header.stamp = stamp
+                img.header.frame_id = "camera"
+                img.format = "jpeg"
+                with open(cam["image"], "rb") as f:
+                    img.data = f.read()
+                self.pub_image.publish(img)
             rclpy.spin_once(self, timeout_sec=0.0)
         self.get_logger().info(f"replayed {k + 1} frames")
 

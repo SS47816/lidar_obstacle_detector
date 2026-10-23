@@ -131,7 +131,7 @@ Box fitAxisAlignedBox(const pcl::PointCloud<PointT> &cloud, const pcl::Indices &
 }
 
 // Yaw from the principal axis of the x-y covariance (no roll / pitch, input
-// is not modified -- both were bugs of the v1 PCA box).
+// is not modified).
 template <typename PointT>
 Box fitPcaBox(const pcl::PointCloud<PointT> &cloud, const pcl::Indices &indices) {
   float z_min, z_max;

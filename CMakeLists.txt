@@ -194,7 +194,7 @@ if(LOD_ROS_VERSION STREQUAL "2")
   install(TARGETS obstacle_detector_component lidar_obstacle_detector_core
     ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
   install(DIRECTORY core/include/ DESTINATION include)
-  install(DIRECTORY launch config rviz DESTINATION share/${PROJECT_NAME}
+  install(DIRECTORY launch config rviz meshes DESTINATION share/${PROJECT_NAME}
     PATTERN "*.launch" EXCLUDE PATTERN "lidar_obstacle_detector.rviz" EXCLUDE PATTERN "mai_city.rviz" EXCLUDE)
 
   if(BUILD_TESTING)
@@ -234,7 +234,7 @@ elseif(LOD_ROS_VERSION STREQUAL "1")
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
   install(DIRECTORY core/include/ DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION})
-  install(DIRECTORY launch rviz DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  install(DIRECTORY launch rviz meshes DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
     PATTERN "*.launch.py" EXCLUDE PATTERN "*ros2*" EXCLUDE)
 
   if(CATKIN_ENABLE_TESTING)
@@ -258,7 +258,6 @@ endif()
 if(LOD_BUILD_TOOLS)
   find_package(nlohmann_json REQUIRED)
   add_executable(lod_benchmark tools/lod_benchmark.cpp)
-  target_include_directories(lod_benchmark PRIVATE tools legacy/include)
-  target_compile_definitions(lod_benchmark PRIVATE LOD_HAVE_CORE)
+  target_include_directories(lod_benchmark PRIVATE tools)
   target_link_libraries(lod_benchmark PRIVATE lidar_obstacle_detector_core nlohmann_json::nlohmann_json)
 endif()

@@ -2,7 +2,7 @@
 
  * Copyright (C) 2021-2026 SS47816
 
- * Common interface between the benchmark CLI and the pipelines it compares.
+ * Output of one frame as written by the benchmark CLI.
 
 **/
 
@@ -13,6 +13,7 @@
 #include <pcl/point_types.h>
 
 #include <Eigen/Geometry>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <map>
@@ -35,6 +36,7 @@ struct OutputBox {
   Eigen::Vector2d velocity = Eigen::Vector2d::Zero();  // world frame
   std::string label = "unknown";
   double score = 1.0;
+  std::vector<Eigen::Vector2d> path;  // predicted positions (sensor frame)
 };
 
 struct FrameOutput {
@@ -46,6 +48,8 @@ struct FrameOutput {
   float occ_resolution = 0.f, occ_origin_x = 0.f, occ_origin_y = 0.f;
   int occ_width = 0, occ_height = 0;
   std::vector<int8_t> occupancy;
+  // 2.5D pillars: x, y, z_min, z_max (sensor frame), observed (1) / remembered (0)
+  std::vector<std::array<float, 5>> pillars;
 };
 
 class PipelineAdapter {
@@ -55,32 +59,12 @@ class PipelineAdapter {
                               const Eigen::Isometry3d &world_T_sensor) = 0;
 };
 
-inline double ms(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) {
-  return std::chrono::duration<double, std::milli>(b - a).count();
-}
-
 template <typename PointT>
 std::vector<Eigen::Vector3f> toXYZ(const pcl::PointCloud<PointT> &cloud) {
   std::vector<Eigen::Vector3f> out;
   out.reserve(cloud.size());
   for (const auto &p : cloud.points) out.emplace_back(p.x, p.y, p.z);
   return out;
-}
-
-inline float getFloat(const ParamMap &m, const std::string &k, float def) {
-  auto it = m.find(k);
-  return it == m.end() ? def : std::stof(it->second);
-}
-inline int getInt(const ParamMap &m, const std::string &k, int def) {
-  auto it = m.find(k);
-  return it == m.end() ? def : std::stoi(it->second);
-}
-inline bool getBool(const ParamMap &m, const std::string &k, bool def) {
-  auto it = m.find(k);
-  if (it == m.end()) return def;
-  if (it->second == "true" || it->second == "1") return true;
-  if (it->second == "false" || it->second == "0") return false;
-  throw std::invalid_argument("bad bool for " + k + ": " + it->second);
 }
 
 }  // namespace bench

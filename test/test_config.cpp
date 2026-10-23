@@ -48,3 +48,17 @@ TEST(Config, EveryParameterRoundTrips) {
     }
   }
 }
+
+TEST(Config, DetectorModeAliases) {
+  PipelineConfig cfg;
+  setParameter(&cfg, "detector_method", "centerpoint");
+  EXPECT_EQ(cfg.detector.method, DetectorMethod::kLearning);
+  EXPECT_EQ(getParameter(cfg, "detector_method"), "learning");
+  setParameter(&cfg, "detector_method", "hybrid");
+  EXPECT_EQ(getParameter(cfg, "detector_method"), "fused");
+  const auto &table = parameterTable();
+  const auto it = std::find_if(table.begin(), table.end(),
+                               [](const ParamInfo &p) { return p.name == "detector_method"; });
+  ASSERT_NE(it, table.end());
+  EXPECT_EQ(it->choices, (std::vector<std::string>{"clustering", "learning", "fused"}));
+}
