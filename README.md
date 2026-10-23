@@ -34,6 +34,9 @@ Data: <a href="https://www.argoverse.org/av2.html">Argoverse 2</a> (CC BY-NC-SA 
   vehicles keep the full size seen earlier in their track.
 - **Occupancy outputs**: a `nav_msgs/OccupancyGrid` with ray-cast free space and 3D occupied voxels,
   ready for nav2 or Autoware costmaps.
+- **Optional GPU detector**: NVIDIA CUDA-CenterPoint (TensorRT) adds class labels and full
+  headings. Recall@1m on Argoverse 2 rises from 0.66 to 0.88 (0.91 in `hybrid` mode, which also
+  keeps unknown obstacles), at about 15 ms per scan on an RTX 3090 Ti.
 - **ROS 1 and ROS 2** nodes on one ROS-agnostic C++ library, live-tunable parameters, and outputs
   for `vision_msgs`, Autoware, jsk and RViz.
 - **Reproducible**: a public benchmark on Argoverse 2 and nuScenes, unit tests, CI for Noetic, Humble
@@ -191,6 +194,57 @@ for (const Box &b : result.boxes) { /* b.id, b.center, b.size, b.yaw, b.velocity
 // result.structures / structure_boxes, result.occupancy (2D grid), result.occupied_voxels
 ```
 
+## Learned detectors (optional, GPU)
+
+With an NVIDIA GPU, the clustering detector can be replaced or complemented by
+[CUDA-CenterPoint](https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution/tree/master/CUDA-CenterPoint)
+(NVIDIA, MIT licence). It is a 3D detector trained on nuScenes for 10 classes (car, truck, bus,
+trailer, construction vehicle, pedestrian, motorcycle, bicycle, barrier, traffic cone). It runs
+with TensorRT and NVIDIA's sparse-convolution library.
+
+| `detector_method` | What you get |
+|---|---|
+| `clustering` (default) | model-free obstacles, CPU only |
+| `centerpoint` | class labels, scores and full headings for the 10 classes |
+| `hybrid` | CenterPoint objects plus every cluster that CenterPoint does not cover, kept as `unknown` (anything the network was not trained on) |
+
+<!-- LEARNED:BEGIN -->
+| Dataset | Detector | Recall@1m | Recall@IoU.3 | BEV IoU | IDF1* | ID switches | Moving heading err. | Label acc. | Runtime [ms] |
+|---|---|---|---|---|---|---|---|---|---|
+| Argoverse 2 (15 logs) | clustering (`fast`, CPU) | 0.66 | 0.62 | 0.51 | 0.73 | 1,725 | 14° | – | 7.7 |
+| Argoverse 2 (15 logs) | `centerpoint` | 0.88 | 0.87 | 0.69 | 0.82 | 1,534 | 4° | 98% | 15.1 |
+| Argoverse 2 (15 logs) | `hybrid` | 0.91 | 0.89 | 0.67 | 0.81 | 1,804 | 5° | 98% | 17.3 |
+| nuScenes val (2 scenes) | clustering (`fast`, CPU) | 0.38 | 0.32 | 0.43 | 0.55 | 135 | 19° | – | 2.8 |
+| nuScenes val (2 scenes) | `centerpoint` | 0.93 | 0.91 | 0.70 | 0.80 | 146 | 5° | 98% | 10.1 |
+| nuScenes val (2 scenes) | `hybrid` | 0.93 | 0.91 | 0.69 | 0.80 | 163 | 5° | 98% | 11.5 |
+
+The table measures single-sweep inference on an RTX 3090 Ti with an i9-12900K, at about 9 ms per scan
+inside the network. CenterPoint was trained on nuScenes, so it is scored only on the two
+nuScenes-mini **val** scenes, and AV2 is a different lidar setup it has never seen. The detector
+and tracking metrics are class-agnostic and the same as in the main table; label accuracy is the
+share of matched objects whose class agrees with the ground truth.
+<!-- LEARNED:END -->
+
+**Build.** You need CUDA (11.4, 12.x or 13), TensorRT ≥ 10 and protobuf. Then:
+
+```bash
+colcon build --packages-select lidar_obstacle_detector --cmake-args -DLOD_WITH_TENSORRT=ON   # ROS 2
+pixi run -e gpu gpu-build                                                                       # or: plain CMake via pixi
+```
+
+CMake downloads NVIDIA's prebuilt `libspconv` for your CPU architecture and CUDA version, together
+with the ONNX models, and checks their SHA-256. The first run builds a TensorRT engine for your GPU
+(about a minute) and caches it in `~/.cache/lidar_obstacle_detector`. `libspconv` runs on Ampere
+and newer GPUs (tested on an RTX 3090 Ti; NVIDIA also supports Jetson Orin).
+
+**Use.** Set `detector_method: hybrid` (or `centerpoint`) and make sure `sensor_height` matches
+your lidar: the network expects nuScenes' mounting height and the input is shifted accordingly.
+Without a TensorRT build, these modes are rejected with an error and the node keeps running.
+
+**Your own network.** `ObstacleDetector::setLearnedDetector()` accepts any implementation of
+`LearnedDetector` (labelled boxes in the sensor frame). The tracker, hybrid merging, occupancy and
+ROS outputs then work unchanged.
+
 ## Parameters
 
 Every parameter has the same name in ROS 1, ROS 2 and the benchmark CLI. The full list, with
@@ -237,7 +291,9 @@ and odometry TF.
 - [x] Robust ground segmentation (Patchwork++)
 - [x] Heading from motion, shape completion, height-aware clustering
 - [x] Occupancy outputs (2D grid with free space, 3D voxels)
-- [ ] Optional GPU detectors: NVIDIA CUDA-PointPillars / CUDA-CenterPoint (TensorRT), fused with the clustering detector for unknown objects
+- [x] Optional GPU detector: NVIDIA CUDA-CenterPoint (TensorRT), with a hybrid mode for unknown obstacles
+- [ ] Multi-sweep input for CenterPoint (it was trained on 10 accumulated sweeps)
+- [ ] NVIDIA CUDA-PointPillars as a second learned backend
 - [ ] Release on the ROS buildfarm (`apt install ros-<distro>-lidar-obstacle-detector`)
 - [ ] Python bindings
 - [ ] Motion undistortion of rotating lidar scans

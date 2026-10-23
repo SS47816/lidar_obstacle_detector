@@ -178,6 +178,8 @@ int main(int argc, char **argv) {
                    {"size", {b.size.x(), b.size.y(), b.size.z()}},
                    {"yaw", b.yaw}};
         if (b.has_velocity) jb["velocity"] = {b.velocity.x(), b.velocity.y()};
+        jb["label"] = b.label;
+        jb["score"] = b.score;
         boxes.push_back(jb);
       }
       rec["boxes"] = boxes;

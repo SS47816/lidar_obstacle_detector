@@ -47,6 +47,29 @@ void alignYaw(float reference, Box *det) {
   det->yaw = best;
 }
 
+// Coarse class groups: a track never switches between them
+int classGroup(ObjectClass c) {
+  switch (c) {
+    case ObjectClass::kCar:
+    case ObjectClass::kTruck:
+    case ObjectClass::kBus:
+    case ObjectClass::kTrailer:
+    case ObjectClass::kConstructionVehicle:
+      return 1;
+    case ObjectClass::kMotorcycle:
+    case ObjectClass::kBicycle:
+      return 2;
+    case ObjectClass::kPedestrian:
+      return 3;
+    case ObjectClass::kBarrier:
+    case ObjectClass::kTrafficCone:
+      return 4;
+    case ObjectClass::kUnknown:
+    default:
+      return 0;
+  }
+}
+
 }  // namespace
 
 MultiObjectTracker::MultiObjectTracker(const TrackerConfig &cfg) : cfg_(cfg) {}
@@ -73,6 +96,8 @@ void MultiObjectTracker::predict(Track *t, float dt) const {
 float MultiObjectTracker::cost(const Track &t, const Box &det) const {
   const float dist = (t.x.head<2>() - det.center.head<2>()).norm();
   if (dist > cfg_.max_distance) return static_cast<float>(kInvalid);
+  const int gt = classGroup(t.label), gd = classGroup(det.label);
+  if (gt != 0 && gd != 0 && gt != gd) return static_cast<float>(kInvalid);
   if (cfg_.cost == TrackCost::kCenterDistance) return dist;
   const Box predicted(t.id, Eigen::Vector3f(t.x(0), t.x(1), t.z), t.size, t.yaw);
   const float giou = bevGIoU(predicted, det);
@@ -131,8 +156,18 @@ void MultiObjectTracker::correct(Track *t, Box *det, double stamp,
   // box-fitting yaw made consistent with the track (90 / 180 deg ambiguity)
   float heading = 0.f;
   bool hint = false;
-  const bool from_motion = motionHeading(t, &heading, &hint);
-  if (from_motion) {
+  bool from_motion = motionHeading(t, &heading, &hint);
+  // Learned detections come with a full heading and full extents: keep them
+  const bool learned = det->label != ObjectClass::kUnknown;
+  if (learned) {
+    from_motion = false;
+    det->heading_known = true;
+    // ...except that a moving object drives forwards: fix a flipped heading
+    if (hint && std::abs(wrapAngle(det->yaw - heading)) > 0.5f * kPi)
+      det->yaw = wrapAngle(det->yaw + kPi);
+    t->yaw = det->yaw;
+    t->extent = det->size.head<2>();
+  } else if (from_motion) {
     // If the reference orientation turns by an odd multiple of 90 deg, length
     // and width swap roles: keep the size memory consistent with the new axes
     const int quarter_turns =
@@ -163,7 +198,7 @@ void MultiObjectTracker::correct(Track *t, Box *det, double stamp,
   // The filter tracks the measured centre (what association compares against);
   // completion only changes the reported box
   const Eigen::Vector2f measured = det->center.head<2>();
-  if (cfg_.shape_completion && stable && t->hits + 1 >= cfg_.min_hits)
+  if (cfg_.shape_completion && stable && !learned && t->hits + 1 >= cfg_.min_hits)
     completeShape(*t, sensor_xy, det);
 
   // Kalman update
@@ -175,7 +210,8 @@ void MultiObjectTracker::correct(Track *t, Box *det, double stamp,
   t->P = (Eigen::Matrix4f::Identity() - K * Eigen::Matrix<float, 2, 4>::Identity()) * t->P;
 
   const float a = cfg_.size_smoothing;
-  t->yaw = from_motion ? heading : wrapAngle(t->yaw + a * wrapAngle(det->yaw - t->yaw));
+  if (!learned)
+    t->yaw = from_motion ? heading : wrapAngle(t->yaw + a * wrapAngle(det->yaw - t->yaw));
   t->size = (1.f - a) * t->size + a * det->size;
   t->z = det->center.z();
   t->hits++;
@@ -194,6 +230,7 @@ MultiObjectTracker::Track MultiObjectTracker::spawn(const Box &det, double stamp
   t.yaw = det.yaw;
   t.motion_heading = 0.f;
   t.heading_streak = 0;
+  t.label = det.label;
   t.z = det.center.z();
   t.hits = 1;
   t.last_update = stamp;
@@ -227,7 +264,7 @@ void MultiObjectTracker::update(double stamp, std::vector<Box> *boxes,
   std::vector<Track> born;
   for (size_t j = 0; j < boxes->size(); ++j) {
     Box &det = (*boxes)[j];
-    const Track *t = nullptr;
+    Track *t = nullptr;
     if (det_to_track[j] >= 0) {
       Track &track = tracks_[det_to_track[j]];
       matched[det_to_track[j]] = true;
@@ -237,6 +274,11 @@ void MultiObjectTracker::update(double stamp, std::vector<Box> *boxes,
       born.push_back(spawn(det, stamp));
       t = &born.back();
     }
+    // The class sticks to the track (e.g. a car later seen only as a cluster)
+    if (det.label != ObjectClass::kUnknown)
+      t->label = det.label;
+    else
+      det.label = t->label;
     det.id = t->id;
     det.age = static_cast<uint32_t>(t->hits);
     det.tracked = t->hits >= cfg_.min_hits;

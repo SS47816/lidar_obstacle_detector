@@ -46,6 +46,8 @@ class CoreAdapter : public PipelineAdapter {
       ob.yaw = b.yaw;
       ob.has_velocity = b.has_velocity;
       ob.velocity = b.velocity.cast<double>();  // already world-aligned
+      ob.label = objectClassName(b.label);
+      ob.score = b.score;
       out.boxes.push_back(ob);
     }
     for (const auto &b : res.structure_boxes) {
@@ -64,13 +66,9 @@ class CoreAdapter : public PipelineAdapter {
     out.ground = toXYZ(*res.ground);
     out.obstacles = toXYZ(*res.obstacles);
     const auto &t = res.timings;
-    out.timing_ms = {{"preprocess", t.preprocess},
-                     {"ground", t.ground},
-                     {"cluster", t.cluster},
-                     {"box", t.box},
-                     {"track", t.track},
-                     {"occupancy", t.occupancy},
-                     {"total", t.total}};
+    out.timing_ms = {{"preprocess", t.preprocess}, {"ground", t.ground}, {"learned", t.learned},
+                     {"cluster", t.cluster},       {"box", t.box},       {"track", t.track},
+                     {"occupancy", t.occupancy},   {"total", t.total}};
     return out;
   }
 

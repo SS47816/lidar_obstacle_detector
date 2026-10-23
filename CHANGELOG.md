@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Optional learned detector**: NVIDIA CUDA-CenterPoint (TensorRT), behind
+  `-DLOD_WITH_TENSORRT=ON`.
+  - `detector_method: centerpoint` reports class labels, scores and full headings for 10 nuScenes
+    classes.
+  - `detector_method: hybrid` adds every cluster that the network does not cover, as an unknown
+    obstacle.
+  - NVIDIA's sources are vendored (MIT) and ported to TensorRT 10 and the current libspconv API.
+    The prebuilt libspconv and the models are downloaded with SHA-256 checks.
+- `Box::label` and `Box::score`. ROS outputs fill the `vision_msgs` and Autoware class fields and
+  the jsk `value`.
+- Tracking is class-aware: tracks keep their class and never match across class groups. Learned
+  boxes keep their predicted heading and size.
+- `ObstacleDetector::setLearnedDetector()` to plug in any other network.
+- pixi `gpu` environment (CUDA 12.8 + TensorRT 10 for drivers ≥ 570).
+
 ## 2.0.0 (unreleased)
 
 A rewrite around a ROS-agnostic core library, with ROS 1 and ROS 2 support, new

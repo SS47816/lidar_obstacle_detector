@@ -211,6 +211,47 @@ are not reported.
 denser AV2 setup they cause more merging, so keep the defaults there. `ground_refine_threshold` between 0.15 and 0.3 m makes little
 difference.
 
+## Learned detector (CUDA-CenterPoint, GPU)
+
+`detector_method: centerpoint` runs NVIDIA's CUDA-CenterPoint. `hybrid` adds the clusters that it
+does not cover. All rows use single sweeps on an RTX 3090 Ti and the same evaluation as above,
+plus label accuracy: the share of matched objects whose predicted class agrees with the ground
+truth's class.
+
+The model was trained on nuScenes, so nuScenes is scored only on the two mini **val** scenes;
+the other mini scenes belong to its training split. Argoverse 2 is a different lidar setup and
+city that the network has never seen.
+
+### Argoverse 2
+
+| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Recall@1m >7m | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | Moving heading err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Structures / frame | Label acc. | Runtime mean / p95 [ms] |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| clustering (`fast`) | 0.661 | 0.818 | 0.617 | 0.543 | 5.3% | 9.7% | 0.512 | 5.9 | 13.9 | 0.725 | 0.709 | 1725 | 0.35 | – | 4.8% | 1.9 | – | 7.7 / 9.3 |
+| `centerpoint` | 0.876 | 0.904 | 0.871 | 0.767 | 5.3% | 2.0% | 0.695 | 2.8 | 4.3 | 0.822 | 0.787 | 1534 | 0.16 | – | 4.8% | 0.0 | 98.4% | 15.1 / 16.6 |
+| `hybrid` | 0.905 | 0.950 | 0.890 | 0.777 | 6.1% | 4.1% | 0.675 | 3.1 | 4.6 | 0.812 | 0.778 | 1804 | 0.18 | – | 4.8% | 1.9 | 97.5% | 17.3 / 19.8 |
+
+### nuScenes val (scene-0103, scene-0916)
+
+| Pipeline | Recall@1m | Recall@2m | Recall@IoU.3 | Recall@1m >7m | Over-seg | Under-seg | BEV IoU | Yaw err [deg] | Moving heading err [deg] | IDF1* | MOTA* | ID sw. | Vel. err [m/s] | Ground IoU | Obj. pts lost | Structures / frame | Label acc. | Runtime mean / p95 [ms] |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| clustering (`fast`) | 0.378 | 0.508 | 0.320 | 0.733 | 1.6% | 16.6% | 0.429 | 4.0 | 19.0 | 0.550 | 0.426 | 135 | 0.45 | 0.928 | 5.3% | 0.4 | – | 2.8 / 3.5 |
+| `centerpoint` | 0.926 | 0.957 | 0.911 | 1.000 | 10.5% | 1.0% | 0.696 | 3.7 | 5.1 | 0.803 | 0.675 | 146 | 0.17 | 0.928 | 5.3% | 0.0 | 97.9% | 10.1 / 11.3 |
+| `hybrid` | 0.930 | 0.966 | 0.911 | 1.000 | 10.5% | 2.2% | 0.691 | 3.7 | 5.1 | 0.797 | 0.651 | 163 | 0.18 | 0.928 | 5.3% | 0.4 | 97.9% | 11.5 / 14.0 |
+
+
+- **Detection quality**: CenterPoint far exceeds model-free clustering on the classes it knows.
+  Recall@1m is 0.93 vs 0.38 on nuScenes val and 0.88 vs 0.66 on AV2, and BEV IoU is about 0.70 vs
+  0.43–0.51. Velocity error is 0.16–0.17 m/s.
+- **Speed**: it is slower, 10–15 ms per scan in total of which about 9 ms is in the network,
+  against 3–8 ms for clustering on the CPU.
+- **Hybrid** keeps clusters that the network does not explain: around 70 extra unknown obstacles
+  per AV2 frame, such as poles, walls and debris. That buys a little more recall (0.91 on AV2) for
+  slightly more ID switches.
+- **Class-agnostic NMS** across CenterPoint's class heads and **flipping learned headings to match
+  the direction of travel** were both necessary:
+  - ID switches on AV2 dropped from 2,655 to 1,534.
+  - Moving-vehicle heading error dropped from 17° to 4–5°.
+
 ## Reproduce
 
 ```bash

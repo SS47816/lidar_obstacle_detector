@@ -19,6 +19,7 @@ enum class GroundMethod { kRansac, kPatchworkpp };
 enum class ClusterMethod { kEuclidean, kAdaptiveEuclidean, kBevGrid };
 enum class BoxMethod { kAabb, kPca, kLShape };
 enum class TrackCost { kCenterDistance, kGIoU };
+enum class DetectorMethod { kClustering, kCenterPoint, kHybrid };
 
 struct PreprocessConfig {
   // Region of interest in the sensor frame (x forward, y left, z up)
@@ -96,6 +97,16 @@ struct OccupancyConfig {
   float voxel_size = 0.2f;  // 3D occupied voxels [m]
 };
 
+struct DetectorConfig {
+  // clustering: model-free (CPU). centerpoint: NVIDIA CUDA-CenterPoint (needs a
+  // build with LOD_WITH_TENSORRT). hybrid: learned boxes for the known classes
+  // plus clusters that no learned box covers, as unknown obstacles.
+  DetectorMethod method = DetectorMethod::kClustering;
+  float score_threshold = 0.3f;
+  std::string model_dir;     // "" = the models downloaded at build time
+  std::string engine_cache;  // "" = ~/.cache/lidar_obstacle_detector
+};
+
 struct PipelineConfig {
   PreprocessConfig preprocess;
   GroundConfig ground;
@@ -103,6 +114,7 @@ struct PipelineConfig {
   BoxConfig box;
   TrackerConfig tracker;
   OccupancyConfig occupancy;
+  DetectorConfig detector;
 
   // Named presets: "legacy" (v1 behaviour minus its bugs), "fast", "accurate"
   static PipelineConfig preset(const std::string &name);
@@ -117,7 +129,7 @@ struct ParamInfo {
   Type type;
   std::string description;
   double min = 0.0, max = 0.0;       // numeric range (kInt / kDouble)
-  std::vector<std::string> choices;  // allowed values (kString)
+  std::vector<std::string> choices;  // allowed values (kString); empty = free text
 };
 
 // All parameters, in a stable order

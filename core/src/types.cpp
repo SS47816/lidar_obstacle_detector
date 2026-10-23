@@ -78,6 +78,34 @@ float intersectionArea(const Box &a, const Box &b) {
 
 }  // namespace
 
+const char *objectClassName(ObjectClass c) {
+  switch (c) {
+    case ObjectClass::kCar:
+      return "car";
+    case ObjectClass::kTruck:
+      return "truck";
+    case ObjectClass::kBus:
+      return "bus";
+    case ObjectClass::kTrailer:
+      return "trailer";
+    case ObjectClass::kConstructionVehicle:
+      return "construction_vehicle";
+    case ObjectClass::kPedestrian:
+      return "pedestrian";
+    case ObjectClass::kMotorcycle:
+      return "motorcycle";
+    case ObjectClass::kBicycle:
+      return "bicycle";
+    case ObjectClass::kBarrier:
+      return "barrier";
+    case ObjectClass::kTrafficCone:
+      return "traffic_cone";
+    case ObjectClass::kUnknown:
+    default:
+      return "unknown";
+  }
+}
+
 float wrapAngle(float a) {
   a = std::fmod(a + static_cast<float>(M_PI), 2.f * static_cast<float>(M_PI));
   if (a <= 0.f) a += 2.f * static_cast<float>(M_PI);

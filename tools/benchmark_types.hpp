@@ -33,6 +33,8 @@ struct OutputBox {
   double yaw = 0.0;
   bool has_velocity = false;
   Eigen::Vector2d velocity = Eigen::Vector2d::Zero();  // world frame
+  std::string label = "unknown";
+  double score = 1.0;
 };
 
 struct FrameOutput {

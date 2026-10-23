@@ -16,6 +16,7 @@ option(LOD_BUILD_TESTS "Build unit tests" OFF)
 option(LOD_BUILD_TOOLS "Build the offline benchmark CLI" OFF)
 option(LOD_WITH_OPENMP "Parallelise per-cluster work with OpenMP" ON)
 option(LOD_SANITIZE "Build with address & undefined-behaviour sanitizers" OFF)
+option(LOD_WITH_TENSORRT "Build the learned detectors (NVIDIA CUDA-CenterPoint; needs CUDA + TensorRT)" OFF)
 
 if(LOD_SANITIZE)
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
@@ -47,6 +48,7 @@ target_compile_options(lod_patchworkpp PRIVATE -w)  # third-party code, keep our
 add_library(lidar_obstacle_detector_core
   core/src/config.cpp
   core/src/hungarian.cpp
+  core/src/learned_detector.cpp
   core/src/obstacle_detector.cpp
   core/src/occupancy.cpp
   core/src/patchworkpp_segmenter.cpp
@@ -69,12 +71,81 @@ if(OpenMP_CXX_FOUND)
   target_link_libraries(lidar_obstacle_detector_core PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
+# ------------------------------------------------------------------------------
+# Optional learned detector: NVIDIA CUDA-CenterPoint (MIT), see
+# third_party/cuda_centerpoint/VENDORED.md. libspconv and the models are
+# downloaded at configure time (cmake/CenterPointAssets.cmake).
+# ------------------------------------------------------------------------------
+if(LOD_WITH_TENSORRT)
+  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+  if(NOT CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 75 80 86 87 89)  # libspconv runs on sm_80, sm_86, sm_87 and newer
+  endif()
+  enable_language(CUDA)
+  find_package(CUDAToolkit REQUIRED)
+  find_package(TensorRT 10 REQUIRED)
+  find_package(Protobuf CONFIG QUIET)
+  if(NOT Protobuf_FOUND)
+    find_package(Protobuf REQUIRED)
+  endif()
+  include(CenterPointAssets)
+
+  set(_cp ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cuda_centerpoint)
+  set(_pb ${CMAKE_CURRENT_BINARY_DIR}/onnx)
+  if(TARGET protobuf::protoc)
+    set(_protoc $<TARGET_FILE:protobuf::protoc>)
+  else()
+    set(_protoc ${Protobuf_PROTOC_EXECUTABLE})
+  endif()
+  add_custom_command(
+    OUTPUT ${_pb}/onnx-ml.pb.cc ${_pb}/onnx-ml.pb.h ${_pb}/onnx-operators-ml.pb.cc ${_pb}/onnx-operators-ml.pb.h
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${_pb}
+    COMMAND ${_protoc} --cpp_out=${_pb} -I ${_cp}/onnx onnx-ml.proto onnx-operators-ml.proto
+    DEPENDS ${_cp}/onnx/onnx-ml.proto ${_cp}/onnx/onnx-operators-ml.proto
+    COMMENT "Generating ONNX protobuf sources")
+
+  add_library(lod_centerpoint STATIC
+    core/gpu/centerpoint_detector.cpp
+    ${_cp}/src/centerpoint.cpp
+    ${_cp}/src/postprocess.cpp
+    ${_cp}/src/postprocess_kernels.cu
+    ${_cp}/src/preprocess.cpp
+    ${_cp}/src/preprocess_kernels.cu
+    ${_cp}/src/tensorrt.cpp
+    ${_cp}/spconv/parser/onnx-parser.cpp
+    ${_pb}/onnx-ml.pb.cc
+    ${_pb}/onnx-operators-ml.pb.cc
+  )
+  set_target_properties(lod_centerpoint PROPERTIES POSITION_INDEPENDENT_CODE ON CUDA_SEPARABLE_COMPILATION OFF)
+  target_include_directories(lod_centerpoint PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/include ${_cp}/include ${_cp}/spconv/include ${_cp}/spconv/parser
+    ${CMAKE_CURRENT_BINARY_DIR} ${_pb})
+  target_compile_definitions(lod_centerpoint PRIVATE
+    LOD_CENTERPOINT_MODEL_DIR="${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/centerpoint"
+    LOD_CENTERPOINT_MODEL_BUILD_DIR="${LOD_CENTERPOINT_MODEL_BUILD_DIR}")
+  target_compile_options(lod_centerpoint PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-w> $<$<COMPILE_LANGUAGE:CUDA>:-w>)
+  target_link_libraries(lod_centerpoint PUBLIC
+    ${LOD_SPCONV_LIBRARY} TensorRT::TensorRT protobuf::libprotobuf CUDA::cudart Eigen3::Eigen)
+  get_filename_component(_spconv_dir ${LOD_SPCONV_LIBRARY} DIRECTORY)
+  get_filename_component(_trt_dir ${TensorRT_LIBRARY} DIRECTORY)
+
+  target_compile_definitions(lidar_obstacle_detector_core PUBLIC LOD_WITH_TENSORRT)
+  target_link_libraries(lidar_obstacle_detector_core PRIVATE $<BUILD_INTERFACE:lod_centerpoint>
+    ${LOD_SPCONV_LIBRARY} TensorRT::TensorRT protobuf::libprotobuf CUDA::cudart)
+  set(CMAKE_BUILD_RPATH "${_spconv_dir};${_trt_dir}")
+  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib;${_trt_dir}")
+  install(FILES ${LOD_SPCONV_LIBRARY} DESTINATION lib)
+  install(DIRECTORY ${LOD_CENTERPOINT_MODEL_BUILD_DIR}/ DESTINATION share/${PROJECT_NAME}/centerpoint)
+  message(STATUS "lidar_obstacle_detector: CUDA-CenterPoint enabled (TensorRT ${TensorRT_VERSION}, CUDA ${CUDAToolkit_VERSION})")
+endif()
+
 set(LOD_TEST_SOURCES
   test/test_box_fitting.cpp
   test/test_clustering.cpp
   test/test_config.cpp
   test/test_geometry.cpp
   test/test_hungarian.cpp
+  test/test_learned.cpp
   test/test_occupancy.cpp
   test/test_pipeline.cpp
   test/test_tracker.cpp
