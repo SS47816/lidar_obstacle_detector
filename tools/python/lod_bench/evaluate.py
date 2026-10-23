@@ -5,11 +5,16 @@ that have no labels, so plain precision / MOTA would mostly measure "how much un
 stuff is there". We therefore report:
 
 * detection: recall of obstacle-class GT (vehicle/pedestrian/cyclist, >= min_pts points,
-  centre in the eval ROI) at BEV centre distance <= 1 m / 2 m and at BEV IoU >= 0.3
-* segmentation: over-segmentation (GT split into >= 2 predicted boxes) and
-  under-segmentation (GT merged with another GT into one predicted box)
+  centre in the eval ROI) at BEV centre distance <= 1 m / 2 m and at BEV IoU >= 0.3, and the
+  coverage: GT reported either as a box or by at least one 2.5D pillar in its footprint
+  (unrecognised objects are not missed when they are pillars)
+* segmentation: over-segmentation (GT split into >= 2 predicted boxes), its rate on large
+  vehicles (> 7 m), and under-segmentation (GT merged with another GT into one predicted box)
 * boxes: mean BEV IoU and orientation error (mod 90 deg, vehicles) of centre matches, and the
-  heading error of moving vehicles (front/back counts)
+  heading error of moving vehicles (front/back counts), and the box jitter: frame-to-frame shape
+  change (1 - BEV IoU with the centres aligned) of a track matched to the same GT
+* pillars: flicker, the share of static pillar cells (outside GT objects, within 25 m) that
+  appear or disappear between consecutive annotated frames
 * tracking: FP-filtered CLEAR/ID metrics (predictions further than 2 m from every GT are
   ignored): MOTA*, IDF1, ID switches, fragmentations, mostly-tracked ratio, and the
   velocity error of matched tracks
@@ -43,6 +48,8 @@ from geometry import (  # noqa: E402
 )
 
 MATCH_DIST = 2.0  # [m] association gate (as in the nuScenes tracking benchmark)
+PILLAR_RES = 0.2  # [m] pillar cell size (occupancy_resolution)
+FLICKER_RANGE = 25.0  # [m]
 
 # Learned detector labels -> evaluation classes ("unknown" from clustering is not scored)
 LABEL_TO_CLS = {
@@ -108,11 +115,36 @@ def world_center(o, pose):
     return pose[:3, :3] @ c + pose[:3, 3]
 
 
+def load_pillars(res_dir, idx):
+    """N x 5: x, y, z_min, z_max (sensor frame), observed."""
+    path = os.path.join(res_dir, "clouds", f"{idx:06d}_pillars.bin")
+    if not os.path.exists(path):
+        return np.zeros((0, 5))
+    p = np.fromfile(path, np.int16).reshape(-1, 5).astype(np.float64)
+    p[:, :4] /= 100.0
+    return p
+
+
+def pillar_cells(pillars, pose, origin, objs):
+    """Keys (tracking-frame cells) of static pillars within FLICKER_RANGE, outside GT objects."""
+    if not len(pillars):
+        return set()
+    xy = pillars[:, :2]
+    keep = np.hypot(xy[:, 0], xy[:, 1]) <= FLICKER_RANGE
+    for o in objs:
+        keep &= ~points_in_bev_box(xy, o["center"], o["size"], o["yaw"], margin=0.5)
+    w = (pose[:3, :3] @ np.c_[xy[keep], np.zeros(keep.sum())].T).T + pose[:3, 3] - origin
+    return set(map(tuple, np.floor(w[:, :2] / PILLAR_RES).astype(np.int64)))
+
+
 def evaluate_sequence(seq_dir, res_dir, cfg, min_pts, stats, acc):
     meta, frames, gt = read_sequence(seq_dir)
     with open(os.path.join(res_dir, "results.jsonl")) as f:
         results = {r["idx"]: r for r in map(json.loads, f)}
     gt_ids = {}  # motmetrics wants numeric ids
+    origin = np.asarray(frames[0]["pose"]).reshape(4, 4)[:3, 3] if frames else np.zeros(3)
+    prev_cells, prev_pose = None, None
+    prev_shape = {}  # GT id -> (track id, size, yaw) in the previous annotated frame
 
     for fr in frames:
         idx = fr["idx"]
@@ -136,8 +168,49 @@ def evaluate_sequence(seq_dir, res_dir, cfg, min_pts, stats, acc):
         for o in targets:
             stats["n_gt_cls"][o["cls"]] += 1
 
+        # --- coverage: a box or 2.5D pillars --------------------------------
+        pillars = load_pillars(res_dir, idx)
+        pc_all = np.array([p["center"][:2] for p in preds]) if preds else np.zeros((0, 2))
+        for g in targets:
+            covered = (
+                len(pc_all)
+                and points_in_bev_box(pc_all, g["center"], g["size"], g["yaw"], margin=0.5).any()
+            )
+            if not covered and len(pillars):
+                covered = points_in_bev_box(
+                    pillars[:, :2], g["center"], g["size"], g["yaw"], margin=0.2
+                ).any()
+            stats["covered"] += int(bool(covered))
+        stats["n_pillars"] += len(pillars)
+        pose = np.asarray(fr["pose"]).reshape(4, 4)
+        if "pillars" in res or prev_cells is not None:
+            cells = pillar_cells(pillars, pose, origin, objs)
+            if prev_cells is not None and np.linalg.norm(pose[:3, 3] - prev_pose[:3, 3]) < 5.0:
+                # only cells within range of both sensor positions
+                def near(c, p):
+                    ctr = (np.array(c) + 0.5) * PILLAR_RES + origin[:2] - p[:2, 3]
+                    return np.hypot(*ctr) <= FLICKER_RANGE - 1.0
+
+                a = {c for c in prev_cells if near(c, pose)}
+                b = {c for c in cells if near(c, prev_pose)}
+                if a | b:
+                    stats["flicker_changed"] += len(a ^ b)
+                    stats["flicker_total"] += len(a | b)
+            prev_cells, prev_pose = cells, pose
+
         # --- detection recall & box quality ---------------------------------
         cm = match(targets, preds, center_dist, MATCH_DIST)
+        shape = {}
+        for gi, pi, _ in cm:
+            g, p = targets[gi], preds[pi]
+            shape[g["id"]] = (p["id"], np.asarray(p["size"]), p["yaw"])
+            last = prev_shape.get(g["id"])
+            if last is not None and last[0] == p["id"]:
+                iou = bev_iou(
+                    (np.zeros(3), last[1], last[2]), (np.zeros(3), shape[g["id"]][1], p["yaw"])
+                )
+                stats["jitter"].append(1.0 - iou)
+        prev_shape = shape
         stats["n_structures"] += len(res.get("structures", []))
         for o in targets:
             if o["size"][0] > 7.0:
@@ -170,6 +243,8 @@ def evaluate_sequence(seq_dir, res_dir, cfg, min_pts, stats, acc):
                 inside = points_in_bev_box(pc, g["center"], g["size"], g["yaw"], margin=0.3)
                 if inside.sum() >= 2:
                     stats["over_seg"] += 1
+                    if g["size"][0] > 7.0:
+                        stats["over_seg_large"] += 1
             if len(targets) >= 2:
                 gc = np.array([g["center"][:2] for g in targets])
                 merged = np.zeros(len(targets), bool)
@@ -254,6 +329,13 @@ def summarize(stats, acc_list, names):
     for c in OBSTACLE_CLASSES:
         out[f"recall@1m_{c}"] = stats["hit_1m_cls"][c] / max(stats["n_gt_cls"][c], 1)
     out["recall@iou0.3"] = stats["hit_iou03"] / n_gt
+    out["coverage"] = stats["covered"] / n_gt
+    out["pillars_per_frame"] = stats["n_pillars"] / max(stats["frames"], 1)
+    if stats["flicker_total"]:
+        out["pillar_flicker"] = stats["flicker_changed"] / stats["flicker_total"]
+    out["large_split_rate"] = stats["over_seg_large"] / max(stats["n_gt_large"], 1)
+    if stats["jitter"]:
+        out["box_jitter"] = float(np.mean(stats["jitter"]))
     out["over_seg_rate"] = stats["over_seg"] / n_gt
     out["under_seg_rate"] = stats["under_seg"] / n_gt
     out["mean_bev_iou"] = float(np.mean(stats["box_iou"])) if stats["box_iou"] else 0.0
@@ -319,7 +401,7 @@ def main():
     cfg = load_cfg(args.cfg)
 
     stats = defaultdict(int)
-    for k in ("box_iou", "yaw_err", "vel_err", "heading_err"):
+    for k in ("box_iou", "yaw_err", "vel_err", "heading_err", "jitter"):
         stats[k] = []
     stats["timing"] = defaultdict(list)
     stats["n_gt_cls"] = defaultdict(int)

@@ -131,6 +131,16 @@ class Sequence:
         out[ok] = is_g[nn[ok]]
         return out
 
+    def pillars(self, run, idx):
+        path = os.path.join(
+            self.run_dirs[run], "clouds", f"{self.frames[idx]['idx']:06d}_pillars.bin"
+        )
+        if not os.path.exists(path):
+            return np.zeros((0, 5))
+        p = np.fromfile(path, np.int16).reshape(-1, 5).astype(float)
+        p[:, :4] /= 100.0
+        return p
+
     def structures(self, run, idx):
         return self.runs[run][idx].get("structures", [])
 
@@ -186,7 +196,7 @@ def colour_points(seq, run, idx, pts, boxes):
     struct = points_in_boxes(pts, seq.structures(run, idx)) >= 0
     ground = seq.ground_mask(run, idx, pts)
     h = np.clip((pts[:, 2] + 1.8) / 3.0, 0, 1)
-    if ground is None:  # no dumps (e.g. v1): shade by height
+    if ground is None:  # no cloud dumps: shade by height
         rgb = plt.cm.cool(0.15 + 0.5 * h)[:, :3] * (0.35 + 0.45 * h)[:, None]
     else:
         rgb = np.where(ground[:, None], GROUND_RGB, OTHER_RGB * (0.6 + 0.4 * h)[:, None])
@@ -368,6 +378,19 @@ def draw_bev(ax, seq, run, idx, title, opt):
             zorder=0,
             extent=(-(y0 + meta["height"] * res), -y0, x0, x0 + meta["width"] * res),
         )
+    # 2.5D pillars as grey cells, brighter = taller
+    pil = seq.pillars(run, idx)
+    if len(pil):
+        h = np.clip((pil[:, 3] - pil[:, 2]) / 2.5, 0.2, 1.0)
+        ax.scatter(
+            -pil[:, 1],
+            pil[:, 0],
+            s=1.3,
+            marker="s",
+            linewidths=0,
+            c=np.outer(0.35 + 0.4 * h, [0.82, 0.86, 0.95]),
+            zorder=1,
+        )
     # x forward is up: plot (-y, x)
     ax.scatter(-pts[:, 1], pts[:, 0], s=np.where(owner >= 0, 1.4, 0.35), c=col, linewidths=0)
     for tid, tr in seq.trails(run, idx).items():
@@ -431,13 +454,14 @@ def render_compare(job):
     plt.close(fig)
 
 
-def encode(frame_dir, out, fps, width):
+def encode(frame_dir, out, fps, width, gif_fps=None, colors=192, dither="sierra2_4a"):
+    """PNG frames -> GIF (optimised palette; `gif_fps` drops frames) or H.264 MP4."""
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None:
         sys.exit("ffmpeg not found; frames are in " + frame_dir)
     pattern = os.path.join(frame_dir, "%05d.png")
     if out.endswith(".gif"):
-        vf = f"fps={fps},scale={width}:-1:flags=lanczos"
+        vf = f"fps={gif_fps or fps},scale={width}:-1:flags=lanczos"
         pal = os.path.join(frame_dir, "palette.png")
         subprocess.run(
             [
@@ -450,7 +474,7 @@ def encode(frame_dir, out, fps, width):
                 "-i",
                 pattern,
                 "-vf",
-                vf + ",palettegen=max_colors=192:stats_mode=diff",
+                vf + f",palettegen=max_colors={colors}:stats_mode=diff",
                 pal,
             ],
             check=True,
@@ -468,7 +492,7 @@ def encode(frame_dir, out, fps, width):
                 "-i",
                 pal,
                 "-lavfi",
-                vf + "[x];[x][1:v]paletteuse=dither=sierra2_4a:diff_mode=rectangle",
+                vf + f"[x];[x][1:v]paletteuse=dither={dither}:diff_mode=rectangle",
                 "-loop",
                 "0",
                 out,
@@ -513,8 +537,8 @@ def main():
     ap.add_argument("--fps", type=int, default=10)
     ap.add_argument("--width", type=int, default=960, help="output width in pixels")
     ap.add_argument("--subtitle", default="")
-    ap.add_argument("--title-a", default="v2")
-    ap.add_argument("--title-b", default="v1")
+    ap.add_argument("--title-a", default="run")
+    ap.add_argument("--title-b", default="run b")
     ap.add_argument("--credit", default="")
     ap.add_argument("--sensor-height", type=float, default=1.7)
     ap.add_argument("--jobs", type=int, default=8)
