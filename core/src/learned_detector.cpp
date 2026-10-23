@@ -34,7 +34,7 @@ std::unique_ptr<LearnedDetector> makeLearnedDetector(const DetectorConfig &cfg,
 #else
   (void)sensor_height;
   throw std::runtime_error(
-      "detector_method 'centerpoint' / 'hybrid' needs a build with -DLOD_WITH_TENSORRT=ON "
+      "detector_method 'learning' / 'fused' needs a build with -DLOD_WITH_TENSORRT=ON "
       "(CUDA + TensorRT)");
 #endif
 }

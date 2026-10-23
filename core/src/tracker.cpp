@@ -27,6 +27,10 @@ constexpr int kMinHeadingStreak = 2;
 // Shape completion: only for objects up to roughly vehicle size
 constexpr float kMaxCompletedLength = 16.f, kMaxCompletedWidth = 4.f;
 constexpr float kExtentGrow = 0.3f, kExtentShrink = 0.05f;
+// Prediction: objects slower than this are treated as stationary (no path)
+constexpr float kMinPredictionSpeed = 1.f;  // [m/s]
+constexpr float kMaxYawRate = 0.8f;         // [rad/s]
+constexpr float kYawRateSmoothing = 0.3f;   // EMA weight of a new turn-rate measurement
 
 // Rotate the detection by a multiple of 90 deg (swapping length / width for odd
 // multiples) so its yaw is as close as possible to the reference yaw. Box
@@ -77,6 +81,22 @@ MultiObjectTracker::MultiObjectTracker(const TrackerConfig &cfg) : cfg_(cfg) {}
 void MultiObjectTracker::reset() {
   tracks_.clear();
   initialized_ = false;
+}
+
+std::vector<Box> MultiObjectTracker::predictedFootprints(double stamp, float min_length) const {
+  std::vector<Box> out;
+  const float dt =
+      initialized_ ? std::clamp(static_cast<float>(stamp - last_stamp_), 0.f, kMaxDt) : 0.f;
+  for (const auto &t : tracks_) {
+    // Smoothed measured size, not the size memory: that one shrinks slowly and
+    // would keep re-joining two objects that were under-segmented once
+    if (t.hits < cfg_.min_hits || t.size.x() < min_length) continue;
+    const Eigen::Vector2f p = t.x.head<2>() + dt * t.x.tail<2>();
+    Box b(t.id, Eigen::Vector3f(p.x(), p.y(), t.z), t.size, t.yaw);
+    b.tracked = true;
+    out.push_back(b);
+  }
+  return out;
 }
 
 void MultiObjectTracker::predict(Track *t, float dt) const {
@@ -214,8 +234,49 @@ void MultiObjectTracker::correct(Track *t, Box *det, double stamp,
     t->yaw = from_motion ? heading : wrapAngle(t->yaw + a * wrapAngle(det->yaw - t->yaw));
   t->size = (1.f - a) * t->size + a * det->size;
   t->z = det->center.z();
+  updateTurnRate(t, static_cast<float>(stamp - t->last_update));
   t->hits++;
   t->last_update = stamp;
+}
+
+// Turn rate from the change of the velocity direction between updates
+void MultiObjectTracker::updateTurnRate(Track *t, float dt) const {
+  const Eigen::Vector2f v = t->x.tail<2>();
+  const float heading = std::atan2(v.y(), v.x());
+  if (v.norm() >= cfg_.heading_min_speed && t->hits >= 3 && dt > 1e-3f) {
+    const float rate =
+        std::clamp(wrapAngle(heading - t->vel_heading) / dt, -kMaxYawRate, kMaxYawRate);
+    t->yaw_rate += kYawRateSmoothing * (rate - t->yaw_rate);
+  } else {
+    t->yaw_rate *= 1.f - kYawRateSmoothing;
+  }
+  t->vel_heading = heading;
+}
+
+// Constant turn rate and velocity rollout from the filtered state
+void MultiObjectTracker::predictPath(const Track &t, Box *det) const {
+  det->predicted_path.clear();
+  const Eigen::Vector2f v = t.x.tail<2>();
+  const float speed = v.norm();
+  if (cfg_.prediction_horizon <= 0.f || !det->tracked || speed < kMinPredictionSpeed) return;
+  const float theta = std::atan2(v.y(), v.x()), w = t.yaw_rate;
+  const Eigen::Vector2f p0 = t.x.head<2>();
+  for (float dt = cfg_.prediction_step; dt <= cfg_.prediction_horizon + 1e-4f;
+       dt += cfg_.prediction_step) {
+    PredictedPose pose;
+    pose.t = dt;
+    pose.yaw = wrapAngle(theta + w * dt);
+    Eigen::Vector2f p;
+    if (std::abs(w) < 1e-3f) {
+      p = p0 + speed * dt * Eigen::Vector2f(std::cos(theta), std::sin(theta));
+    } else {
+      p = p0 + speed / w *
+                   Eigen::Vector2f(std::sin(theta + w * dt) - std::sin(theta),
+                                   std::cos(theta) - std::cos(theta + w * dt));
+    }
+    pose.position = Eigen::Vector3f(p.x(), p.y(), det->center.z());
+    det->predicted_path.push_back(pose);
+  }
 }
 
 MultiObjectTracker::Track MultiObjectTracker::spawn(const Box &det, double stamp) {
@@ -231,6 +292,8 @@ MultiObjectTracker::Track MultiObjectTracker::spawn(const Box &det, double stamp
   t.motion_heading = 0.f;
   t.heading_streak = 0;
   t.label = det.label;
+  t.vel_heading = 0.f;
+  t.yaw_rate = 0.f;
   t.z = det.center.z();
   t.hits = 1;
   t.last_update = stamp;
@@ -284,6 +347,7 @@ void MultiObjectTracker::update(double stamp, std::vector<Box> *boxes,
     det.tracked = t->hits >= cfg_.min_hits;
     det.has_velocity = t->hits >= 2;
     det.velocity = det.has_velocity ? Eigen::Vector2f(t->x.tail<2>()) : Eigen::Vector2f::Zero();
+    predictPath(*t, &det);
   }
 
   // Drop tentative tracks that missed and confirmed tracks lost for too long

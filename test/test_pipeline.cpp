@@ -143,3 +143,64 @@ TEST(Pipeline, StructuresAndOccupancyAreReported) {
   EXPECT_EQ(res.occupancy.atPoint(5.f, 0.f), OccupancyGrid2D::kFree);
   EXPECT_FALSE(res.occupied_voxels->empty());
 }
+
+namespace {
+
+// A 12 m truck side at y = 6 (x = 4..16); with `gap`, a 1.4 m stretch of it
+// returns no points (e.g. between cab and trailer), splitting the cluster
+Cloud::Ptr truckScene(bool gap, std::mt19937 *rng) {
+  std::normal_distribution<float> n(0.f, 0.01f);
+  Cloud::Ptr cloud(new Cloud);
+  auto add = [&](float x, float y, float z) {
+    pcl::PointXYZI p;
+    p.x = x + n(*rng), p.y = y + n(*rng), p.z = z + n(*rng), p.intensity = 0.f;
+    cloud->push_back(p);
+  };
+  for (float x = -30.f; x <= 30.f; x += 0.3f)
+    for (float y = -20.f; y <= 20.f; y += 0.3f) add(x, y, -kSensorHeight);
+  for (float x = 4.f; x <= 16.f; x += 0.1f) {
+    if (gap && x > 8.3f && x < 9.7f) continue;
+    for (float z = 0.3f; z <= 3.f; z += 0.15f) add(x, 6.f, z - kSensorHeight);
+  }
+  for (float y = 6.f; y <= 8.4f; y += 0.1f)  // its rear face
+    for (float z = 0.3f; z <= 3.f; z += 0.15f) add(4.f, y, z - kSensorHeight);
+  return cloud;
+}
+
+}  // namespace
+
+TEST(Pipeline, TrackGuidedClusteringRejoinsFragmentsOfATrackedTruck) {
+  for (bool guided : {false, true}) {
+    PipelineConfig cfg = sceneConfig("fast");
+    cfg.cluster.track_guided = guided;
+    ObstacleDetector<pcl::PointXYZI> detector(cfg);
+    std::mt19937 rng(11);
+    size_t boxes = 0;
+    for (int k = 0; k < 8; ++k) {
+      const auto res = detector.process(truckScene(k >= 5, &rng), 0.1 * k);
+      if (k < 5) ASSERT_EQ(res.boxes.size(), 1u);
+      boxes = res.boxes.size();
+      if (guided && k >= 5) {
+        ASSERT_EQ(boxes, 1u) << "frame " << k;
+        EXPECT_NEAR(res.boxes[0].size.x(), 12.f, 0.5f);
+      }
+    }
+    if (!guided) EXPECT_EQ(boxes, 2u);  // without the tracks, the gap splits it
+  }
+}
+
+TEST(Pipeline, ClusteringModeReportsAllObstaclesAsPillarsToo) {
+  ObstacleDetector<pcl::PointXYZI> detector(sceneConfig("fast"));
+  std::mt19937 rng(12);
+  const auto res = detector.process(syntheticScene(10.f, &rng), 0.0);
+  ASSERT_EQ(res.boxes.size(), 2u);
+  EXPECT_GT(res.pillar_resolution, 0.f);
+  int car = 0, pole = 0;
+  for (const auto &p : res.pillars) {
+    if (std::abs(p.center.x() - 10.f) < 2.5f && std::abs(p.center.y() - 5.f) < 1.2f) ++car;
+    if ((p.center - Eigen::Vector2f(-8.f, -4.f)).norm() < 0.5f) ++pole;
+    EXPECT_LT(p.z_min, p.z_max);
+  }
+  EXPECT_GT(car, 10);
+  EXPECT_GT(pole, 0);
+}

@@ -18,19 +18,25 @@
 
 namespace lidar_obstacle_detector {
 
+// A network input point in the current sensor frame (x forward, y left, z up).
+// Points of earlier scans are motion-compensated; `time_lag` is their age [s].
+struct SweepPoint {
+  float x, y, z, intensity, time_lag;
+};
+
 class LearnedDetector {
  public:
   virtual ~LearnedDetector() = default;
-  // `points`: x, y, z, intensity in the sensor frame (x forward, y left, z up).
-  // Returns labelled, scored boxes in the same frame; heading_known is set.
-  virtual std::vector<Box> detect(const std::vector<Eigen::Vector4f> &points) = 0;
+  // `points`: the current scan first, then older scans (newest first).
+  // Returns labelled, scored boxes in the sensor frame; heading_known is set.
+  virtual std::vector<Box> detect(const std::vector<SweepPoint> &points) = 0;
   virtual std::string name() const = 0;
 };
 
 // True if this build includes a learned detector backend (LOD_WITH_TENSORRT)
 bool learnedDetectorsAvailable();
 
-// Creates the detector named by cfg.method (e.g. centerpoint); throws
+// Creates the network for cfg.method (learning / fused: CenterPoint); throws
 // std::runtime_error if the backend is not built in or fails to load.
 std::unique_ptr<LearnedDetector> makeLearnedDetector(const DetectorConfig &cfg,
                                                      float sensor_height);

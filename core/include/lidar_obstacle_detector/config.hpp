@@ -19,7 +19,7 @@ enum class GroundMethod { kRansac, kPatchworkpp };
 enum class ClusterMethod { kEuclidean, kAdaptiveEuclidean, kBevGrid };
 enum class BoxMethod { kAabb, kPca, kLShape };
 enum class TrackCost { kCenterDistance, kGIoU };
-enum class DetectorMethod { kClustering, kCenterPoint, kHybrid };
+enum class DetectorMethod { kClustering, kLearning, kFused };
 
 struct PreprocessConfig {
   // Region of interest in the sensor frame (x forward, y left, z up)
@@ -62,6 +62,10 @@ struct ClusterConfig {
   bool separate_structures = false;
   float object_max_length = 16.f;  // [m]
   float object_max_width = 5.f;    // [m]
+  // Use the predicted footprints of confirmed vehicle-sized tracks to re-join
+  // fragments of one object and to separate two objects that touch
+  bool track_guided = false;
+  float track_guided_margin = 0.f;  // [m] footprint growth
   int min_size = 10;
   int max_size = 5000;
 };
@@ -87,6 +91,9 @@ struct TrackerConfig {
   // Partially visible objects keep the size seen earlier in the track,
   // anchored at the face that is visible to the sensor
   bool shape_completion = true;
+  // Predicted path of moving tracks (constant turn rate and velocity); 0 = off
+  float prediction_horizon = 3.f;  // [s]
+  float prediction_step = 0.5f;    // [s]
 };
 
 struct OccupancyConfig {
@@ -95,14 +102,26 @@ struct OccupancyConfig {
   float min_height = 0.2f;  // obstacle points counted between these heights
   float max_height = 2.5f;  // above the local ground [m]
   float voxel_size = 0.2f;  // 3D occupied voxels [m]
+  // 2.5D pillars of unrecognised obstacles are fused over this time window in
+  // the tracking frame (needs a tracking frame, e.g. odom); 0 = this scan only
+  float pillar_memory = 2.f;  // [s]
 };
 
 struct DetectorConfig {
-  // clustering: model-free (CPU). centerpoint: NVIDIA CUDA-CenterPoint (needs a
-  // build with LOD_WITH_TENSORRT). hybrid: learned boxes for the known classes
-  // plus clusters that no learned box covers, as unknown obstacles.
+  // clustering: model-free (CPU); every cluster becomes a tracked box.
+  // learning: NVIDIA CUDA-CenterPoint (needs a build with LOD_WITH_TENSORRT);
+  //   only the classes it was trained on are reported.
+  // fused: learned boxes for recognised objects (absorbing the clusters that
+  //   belong to them), everything else as 2.5D pillars.
   DetectorMethod method = DetectorMethod::kClustering;
   float score_threshold = 0.3f;
+  // Scans accumulated (ego-motion compensated, over at most 0.5 s) as network
+  // input; needs a tracking frame, otherwise a single scan is used
+  int sweeps = 10;
+  // fused: a cluster joins a learned box if this fraction of its points lies
+  // inside the box grown by fused_margin
+  float fused_margin = 0.3f;  // [m]
+  float fused_min_overlap = 0.5f;
   std::string model_dir;     // "" = the models downloaded at build time
   std::string engine_cache;  // "" = ~/.cache/lidar_obstacle_detector
 };
@@ -116,7 +135,7 @@ struct PipelineConfig {
   OccupancyConfig occupancy;
   DetectorConfig detector;
 
-  // Named presets: "legacy" (v1 behaviour minus its bugs), "fast", "accurate"
+  // Named presets: "legacy" (classic RANSAC + Euclidean + axis-aligned boxes), "fast", "accurate"
   static PipelineConfig preset(const std::string &name);
 };
 
